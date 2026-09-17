@@ -26,3 +26,7 @@ data/
 # Agent instructions (local only)
 AGENTS.md
 .codex/
+
+# Phone view over Tailscale (local only): rendered HTML, serve scripts, anything tailnet-related
+.tailscale-share/
+*tailscale*
