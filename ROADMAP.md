@@ -27,14 +27,18 @@ Optional; nothing later depends on it, only on the functions it introduces.
 - [ ] A smooth null model: Heston, spot versus integrated variance
 - [ ] Fact or artefact — noise making a diffusive model look rough
 
-## `03_realised_volatility_spx` — what does the data say, and how sure am I?
+## `03_realised_volatility_es` — what does the data say, and how sure am I?
 
-The only notebook needing market data. Intraday bars come from Interactive Brokers; raw history is
-never committed, and the notebook records the contract, bar size and `whatToShow` used.
+The only notebook needing market data: one-minute bars of the continuous front-month E-mini
+S&P 500 future (ES), 2019–2026, from a private Databento archive, with Interactive Brokers as an
+independent cross-check. The series is an unadjusted splice, so every within-contract return is a
+true return, and the single return spanning each roll is dropped rather than repaired. The sample
+begins five years after Gatheral, Jaisson & Rosenbaum's ends, which makes this an out-of-sample
+re-test of their finding. Raw bars are licensed and never committed.
 
-- [ ] Data provenance probe, then a resumable cached loader
-- [ ] Realised variance, five-minute bars, the signature plot
-- [ ] `Ĥ` on SPX, and the sensitivity table behind it
+- [ ] Data provenance: the archive, the roll, and a cross-check against a second source
+- [ ] Realised variance, the signature plot on real one-minute bars, and why five minutes
+- [ ] `Ĥ` on ES, and the sensitivity table behind it
 - [ ] Bootstrap intervals, rolling estimates, regime splits
 - [ ] Roughness is not memory
 
