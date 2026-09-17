@@ -22,3 +22,7 @@ venv/
 
 # Market data: never commit raw IB history (licence terms)
 data/
+
+# Agent instructions (local only)
+AGENTS.md
+.codex/
