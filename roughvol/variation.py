@@ -108,3 +108,56 @@ def p_variation(path: np.ndarray, p: float) -> np.ndarray:
         raise ValueError(f"path must have at least 2 points, got {path.shape[-1]}")
 
     return np.sum(np.abs(np.diff(path, axis=-1)) ** p, axis=-1)
+
+
+def theta_sum(path: np.ndarray, theta: float = 0.0) -> np.ndarray:
+    """Sum of X dX evaluated at a theta-interpolated point in each step.
+
+    For a path sampled at t_0 < ... < t_n,
+
+        S_theta = sum_i [(1 - theta) X_{t_{i-1}} + theta X_{t_i}] * dX_i,
+        dX_i = X_{t_i} - X_{t_{i-1}}.
+
+    theta = 0 is the Ito sum (the integrand is fixed before the increment
+    arrives), theta = 1/2 the Stratonovich sum, theta = 1 the look-ahead sum
+    the isometry proof forbids. Telescoping dX_i**2 gives the exact identity,
+    for every path and every grid,
+
+        S_theta = (X_T**2 - X_0**2) / 2 + (theta - 1/2) * QV_n,
+
+    with QV_n the realised quadratic variation. For Brownian motion started at
+    0, E[QV_n] = T, so E[S_theta] = theta * T: only theta = 0 is centred, and
+    only theta = 0 is a martingale. The free drift a look-ahead earns is
+    exactly theta times the quadratic variation of section 1.
+
+    Parameters
+    ----------
+    path : numpy.ndarray
+        Sampled path(s); last axis is time, at least 2 points. Shape
+        (m, n + 1) as returned by `roughvol.paths.brownian`, or (n + 1,).
+    theta : float, default 0.0
+        Interpolation point within each step, 0 <= theta <= 1.
+
+    Returns
+    -------
+    numpy.ndarray
+        Shape path.shape[:-1] (a scalar for a single path).
+
+    Raises
+    ------
+    ValueError
+        If theta is outside [0, 1], or the last axis has fewer than 2 points.
+
+    Notes
+    -----
+    Cost: O(path.size), one pass. Bookwork - no equation number is cited.
+    """
+    if not (0.0 <= theta <= 1.0):
+        raise ValueError(f"theta must be in [0, 1], got {theta}")
+    if path.shape[-1] < 2:
+        raise ValueError(f"path must have at least 2 points, got {path.shape[-1]}")
+
+    dX = np.diff(path, axis=-1)
+    left = path[..., :-1]
+    weighted = (1.0 - theta) * left + theta * (left + dX)
+    return np.sum(weighted * dX, axis=-1)
