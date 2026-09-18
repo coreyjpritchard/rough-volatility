@@ -15,14 +15,16 @@ written section by section.
 
 ## Contents
 
-`01_volatility_is_rough.ipynb` — starts from intuition, simulates, plots, and brings in the
-mathematics once the picture is on the screen.
+Six notebooks, one question each, starting from intuition, simulating, plotting, and bringing in
+the mathematics once the picture is on the screen. The section-by-section plan is in
+[ROADMAP.md](ROADMAP.md).
 
-1. Realised variance from intraday bars, and the scaling of log-volatility increments.
-2. Estimating the Hurst exponent, with the estimator checked against simulated fBm of known `H`.
-3. Simulating fractional Brownian motion, and the Volterra kernel behind it.
-4. The rough Bergomi model via the hybrid scheme.
-5. Implied volatility under rough volatility, and the short-maturity skew.
+1. `00_warmup.ipynb` — why is `H = 1/2` a modelling choice, not a fact?
+2. `01_fractional_brownian_motion.ipynb` — what does `H` do to a path?
+3. `02_estimating_h.ipynb` — can I measure `H`, and when does the measurement lie?
+4. `03_realised_volatility_es.ipynb` — what does the data say, and how sure am I?
+5. `04_rough_bergomi.ipynb` — how do I simulate a rough model without fooling myself?
+6. `05_the_smile.ipynb` — does roughness show up in option prices?
 
 ## References
 
@@ -34,7 +36,12 @@ mathematics once the picture is on the screen.
 ## Layout
 
 ```
-01_volatility_is_rough.ipynb
+00_warmup.ipynb
+01_fractional_brownian_motion.ipynb
+02_estimating_h.ipynb
+03_realised_volatility_es.ipynb
+04_rough_bergomi.ipynb
+05_the_smile.ipynb
 roughvol/     estimators, simulation schemes, plotting, IB data access
 tests/        property tests: an estimator run on simulated fBm must recover the known H
 data/         parquet cache of IB history (untracked)
@@ -63,10 +70,17 @@ Every simulation is seeded, and the notebook runs top to bottom from a clean ker
 
 ## Data
 
-Intraday history comes from Interactive Brokers via `ib_async`, with TWS or IB Gateway running
-locally; connection settings live in `.env` (see `.env.example`). All IB access is confined to one
-module, which reads a parquet cache under `data/` and only calls the API when asked to refresh.
-The notebook records which contract, bar size and `whatToShow` were used, and why.
+Only one notebook needs market data. It runs on one-minute bars of the continuous front-month
+E-mini S&P 500 future (ES), 2019–2026, from a private Databento archive. The series is an unadjusted
+splice of contracts: every within-contract return is a true return, and the single return spanning
+each roll is dropped rather than repaired. A difference-adjusted series would not do — shifting the
+price level rescales every log return, and realised variance inherits the square of that error.
 
-Raw IB history is not redistributable and is never committed: this repository ships the loader,
-not the data.
+Interactive Brokers, via `ib_async`, is the independent cross-check on overlapping sessions, with
+TWS or IB Gateway running locally; connection settings live in `.env` (see `.env.example`). All IB
+access is confined to one module. Loaders read a parquet cache under `data/` and touch a network
+only when asked to refresh. The notebook records which contract, bar size and session were used,
+and why.
+
+Raw bars are licensed and never committed: this repository ships the loaders, not the data. Every
+other notebook runs on simulated paths, and so does CI.

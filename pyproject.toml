@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.4"]
+dev = ["pytest>=8.0", "ruff>=0.4", "nbmake>=1.5", "pytest-xdist>=3.5"]
 
 [tool.setuptools]
 packages = ["roughvol"]
