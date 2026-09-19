@@ -43,3 +43,13 @@ def variation_mod(impl):
 @pytest.fixture
 def plotting_mod(impl):
     return _resolve(impl, "plotting")
+
+
+@pytest.fixture
+def bs_mod(impl):
+    return _resolve(impl, "bs")
+
+
+@pytest.fixture
+def smile_mod(impl):
+    return _resolve(impl, "smile")
