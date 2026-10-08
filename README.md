@@ -34,8 +34,8 @@ chain one runnable step at a time: measure H, simulate a rough model, show its s
 ## How to run
 
 ```bash
-source ~/phd/.venv/bin/activate          # shared environment; roughvol is installed editable
-cd ~/phd/rough-volatility
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev,data]"            # once
 marimo run sessions/00_what_is_rough.py  # the app, read-only
 marimo edit sessions/00_what_is_rough.py # the app with its code
 python sessions/00_what_is_rough.py      # run every cell as a script

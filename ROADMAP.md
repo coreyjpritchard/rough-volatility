@@ -1,6 +1,6 @@
 # Roadmap
 
-The session ladder. Levels are defined in `~/phd/CONVENTIONS.md`: 0 play, 1 reproduce,
+The session ladder. Levels are defined in `CLAUDE.md`: 0 play, 1 reproduce,
 2 implement, 3 extend. A box is ticked when Corey has worked through the session.
 
 - [ ] **00 What does H do to a path, and what is H for the S&P 500?** (level 0).
