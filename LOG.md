@@ -3,7 +3,25 @@
 Dated entries, newest first. What was learned, what surprised, open questions.
 
 **Current state:** session 00 built, not yet worked through. RV-a, RV-b and RV-c are
-implemented and not merged. **Next:** session 01, when does the estimator lie.
+on main. Rough Bergomi returns the hybrid-scheme Wiener increments on the
+volatility child. **Next:** session 01, when does the estimator lie.
+
+## 2026-10-14: Wiener increments on the volatility child
+
+**Found.** `RoughBergomi.volterra_increments` returns the hybrid scheme's dW
+and not the kernel weights. The seed is already the volatility child. The
+draw is `hybrid_scheme_rng` on `generator(seed)`, with no further spawn, at
+the model's kappa. On the uniform grid `simulate` accepts, that array is the
+dW inside `simulate` for the same child. The match is exact at H = 0.1 with
+kappa = 2, and at H = 1/2 with kappa = 1: parent seed 11, 6 paths, 8 steps
+on [0, 0.5]. Rebuilding the spot from those increments recovers `simulate`'s
+Z. A grid that turns back, and a grid that is not 1-d, each raise ValueError.
+
+The variance of each increment equals the step length. On 2,000 paths, 64
+steps, 4 replications, seeds 20261014 + 7000 + r, H = 0.1, kappa = 1, the
+second-moment z scores have a largest absolute value of 3.1455. The max
+bound at 64 nodes is 4.3197. The replication mean is -0.0920, the sample
+standard deviation is 0.1474, and the bound 3.5 sd / sqrt(R) is 0.2580.
 
 ## 2026-10-14: RV-c, Hurst by the realised-variance route and by the skew
 

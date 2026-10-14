@@ -37,3 +37,5 @@ The relative error of Var(Y_1) on the same runs has slopes -0.200, -0.198 and -0
 ## Draw order
 
 `hybrid_scheme` spawns one child of the seed. At each step it draws the components (dW, I_1, ..., I_kappa) in that order, one vector of length m per component, and multiplies by the lower Cholesky factor of the block covariance. At H = 1/2 the integrals equal the Wiener increment, the covariance has rank 1, and one normal per path is drawn. The path is then exactly that Brownian motion.
+
+`hybrid_scheme_rng` is the same draw from a generator that already exists. It does not spawn. Rough Bergomi's `volterra_increments` calls it on the volatility child and returns `dW` only. The first entry of the block covariance is the step length, so each of those increments has that variance. The weights are not part of the return.

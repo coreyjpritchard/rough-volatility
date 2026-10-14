@@ -20,7 +20,9 @@ driver and is handed to :func:`roughvol.volterra.hybrid_scheme_rng`, which
 draws, at each step, the components ``(dW, I_1, ..., I_kappa)``, path index
 fastest. Child 2 is the spot: at each step, one standard normal per path,
 scaled by ``sqrt(dt)``, and nothing else. Child 3 is unused (kept for a
-surrogate stream).
+surrogate stream). :meth:`RoughBergomi.volterra_increments` is that same
+volatility draw when the caller already holds child 1. It does not spawn,
+and it returns the Wiener increments only.
 
 The spot step is the left-point exponential. With ``v`` frozen at the left
 end of the step, the multiplier
@@ -338,6 +340,38 @@ class RoughBergomi:
         """
         paths, _mu, _total_var = self._draw(int(n_paths), times, seed=seed, state0=state0)
         return paths
+
+    def volterra_increments(
+        self,
+        n_paths: int,
+        times: np.ndarray,
+        *,
+        seed: int | np.random.SeedSequence,
+        H: float,
+    ) -> np.ndarray:
+        """Wiener increments of the hybrid scheme. Shape ``(n_paths, n_steps)``.
+
+        ``seed`` is already the volatility child. The draw is
+        :func:`roughvol.volterra.hybrid_scheme_rng` on ``generator(seed)``,
+        with no further spawn, at this model's ``kappa``. Column ``k`` is
+        ``W(times[k + 1]) - W(times[k])``, and its variance is the step
+        length. The kernel weights are not returned.
+
+        ``times`` is the uniform grid :meth:`simulate` accepts: length
+        ``n_steps + 1``, starting at 0, strictly increasing, equally spaced.
+        When ``H`` equals this model's ``H``, the array is the ``dW`` inside
+        that ``simulate`` call for the same child.
+        """
+        times = _uniform_times(times)
+        n_paths = int(n_paths)
+        if n_paths < 1:
+            raise ValueError(f"n_paths must be positive, got {n_paths}")
+        n = times.size - 1
+        horizon = float(times[-1])
+        vol = hybrid_scheme_rng(
+            float(H), n, horizon, n_paths, generator(seed), kappa=self.kappa
+        )
+        return vol.dW
 
     def _draw(self, n_paths: int, times: np.ndarray, *, seed, state0):
         times = _uniform_times(times)

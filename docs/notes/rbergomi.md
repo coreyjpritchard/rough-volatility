@@ -13,6 +13,12 @@ The factor sqrt(2H) puts the variance of nu sqrt(2H) Y back to nu^2 t^{2H}, so t
 
 xi0 is a positive level, or a function of time. A host can also pass state["xi"], a scalar or a curve on xi_tenors. That starts a fresh model on the curve.
 
+## Wiener increments
+
+`volterra_increments` returns the hybrid scheme's Wiener increments and nothing else. The seed argument is already the volatility child, the same child `simulate` hands to `hybrid_scheme_rng`. The method calls `generator` on that seed and does not spawn again. It draws at the model's kappa. The time grid is the one `simulate` accepts: it starts at 0, is strictly increasing, and is equally spaced. A grid that turns back raises `ValueError`.
+
+The result has shape `(n_paths, n_steps)`. Column k is W(times[k + 1]) - W(times[k]), and the variance of that column is the step length. When the Hurst argument equals the model's H, the array is the dW inside `simulate` for that child. The kernel weights stay in the hybrid scheme.
+
 ## The forward variance curve
 
 For u > t,

@@ -386,3 +386,66 @@ def test_volsurface_create_resolves_rbergomi():
     model = plugins.create("rbergomi")
     assert isinstance(model, RoughBergomi)
     assert model.price(1.0, np.array([1.0]), 0.25).shape == (1,)
+
+
+def test_volterra_increments_match_simulate_dw():
+    """The volatility child, with no further spawn, is the dW inside simulate.
+
+    Parent seed 11. The method receives child 1. H = 0.1 uses the Cholesky
+    path at kappa = 2. H = 1/2 uses the single-normal path at kappa = 1.
+    """
+    times = np.linspace(0.0, 0.5, 9)
+    parent = 11
+    for H, kappa in ((0.1, 2), (0.5, 1)):
+        model = RoughBergomi(
+            H=H, nu=1.5, rho=-0.4, xi0=0.05, kappa=kappa, n_paths=6, n_steps=8
+        )
+        paths = model.simulate(6, times, seed=parent)
+        child = spawn(parent, 4)[1]
+        dW = model.volterra_increments(6, times, seed=child, H=H)
+        again = model.volterra_increments(6, times, seed=child, H=H)
+        hybrid = hybrid_scheme_rng(H, 8, 0.5, 6, generator(child), kappa=kappa)
+        assert dW.shape == (6, 8)
+        assert np.array_equal(dW, again)
+        assert np.array_equal(dW, hybrid.dW)
+        power = np.zeros_like(times)
+        power[1:] = times[1:] ** (2.0 * H)
+        v = 0.05 * np.exp(1.5 * math.sqrt(2.0 * H) * hybrid.Y - 0.5 * 1.5**2 * power)
+        assert np.allclose(paths.state["v"], v)
+        spot = generator(spawn(parent, 4)[2])
+        log_z = np.zeros(6)
+        Z = np.ones_like(paths.Z)
+        for j in range(8):
+            dt = float(times[j + 1] - times[j])
+            perp = math.sqrt(dt) * spot.standard_normal(6)
+            log_z = log_z + log_multiplier(v[:, j], dW[:, j], perp, -0.4, dt)
+            Z[:, j + 1] = np.exp(log_z)
+        assert np.allclose(paths.Z, Z)
+
+
+def test_volterra_increment_variance_equals_dt():
+    """Second moment of dW equals the step length. m = 2,000, n = 64, R = 4.
+
+    A centred normal has Var(X^2) = 2 dt^2, so the standard error of the
+    mean second moment is dt * sqrt(2 / m). The grid shares paths, so each
+    replication keeps the max bound and the mean of z is judged on R.
+    """
+    model = RoughBergomi(H=0.1, kappa=1)
+    n_steps = 64
+    times = np.linspace(0.0, 1.0, n_steps + 1)
+    dt = 1.0 / n_steps
+    rows = []
+    for r in range(R):
+        dW = model.volterra_increments(M, times, seed=SEED + 7_000 + r, H=0.1)
+        assert dW.shape == (M, n_steps)
+        moment = np.mean(dW**2, axis=0)
+        rows.append((moment - dt) / (dt * np.sqrt(2.0 / M)))
+    _shared(rows)
+
+
+def test_volterra_increments_rejects_non_increasing_times():
+    model = RoughBergomi()
+    with pytest.raises(ValueError, match="strictly increasing"):
+        model.volterra_increments(4, np.array([0.0, 0.3, 0.2, 0.5]), seed=1, H=0.1)
+    with pytest.raises(ValueError, match="1-d"):
+        model.volterra_increments(4, np.array([[0.0, 0.25], [0.5, 1.0]]), seed=1, H=0.1)
