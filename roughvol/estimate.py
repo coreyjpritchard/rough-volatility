@@ -18,7 +18,21 @@ every lag), so they understate the sampling error of H. Measured on 2026-10-08 w
 fBm paths of 5,552 steps, q = 2 and lags 1 to 50, the spread of H across paths was 6 times
 the mean regression SE at H = 0.1, 12 times at H = 0.5 and 20 times at H = 0.7.
 `monte_carlo_se` gives the honest error bar: the spread of the estimate across fBm paths
-of the same length and H.
+of the same length and H. `HurstEstimate` carries that Monte Carlo standard error.
+The regression standard error stays on `HurstFit` and is not the headline error.
+
+The skew route fits `|psi| = A T^{-alpha}` and returns `H = 1/2 - alpha`. That fit is
+deterministic, so its Monte Carlo standard error is NaN. The uncertainty to report with
+a market skew is the range of H across maturity windows.
+
+Per-regime vol of vol uses the intercept of `m(2, Delta)`. If `log sigma = (nu_per_day / 2) B`
+with `B` standard fractional Brownian motion in units of one grid step
+(`Var(B_t) = t^{2H}`), then `m(2, Delta) = (nu_per_day / 2)^2 Delta^{2H}`. The regression
+`log m = a + 2 H log Delta` has `nu_per_day = 2 exp(a / 2)`. That is the standard
+deviation of an increment of `log v = 2 log sigma`, not the variance of the level
+`log v_t`. Rough Bergomi's log variance has stationary increments of size
+`nu sqrt(2 H c_H) dt^H`, with `c_H` from :func:`c_hurst`. One year is 252 trading
+days, so `nu = nu_per_day * 252**H / sqrt(2 H c_H)`.
 
 `hurst_variogram2` is a cross-check built on second-order increments
 x_{t + 2 Delta} - 2 x_{t + Delta} + x_t, whose variance also scales like Delta^(2H). It is
@@ -28,6 +42,7 @@ estimators that Session 01 will look at.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -120,6 +135,251 @@ def hurst_variogram2(x: np.ndarray, lags: Sequence[int] | np.ndarray = range(1, 
     v = np.array([np.mean((x[2 * d :] - 2 * x[d:-d] + x[: -2 * d]) ** 2) for d in lags])
     slope, intercept, se, r2 = _ols(np.log(lags), np.log(v))
     return HurstFit(2.0, lags, v, slope, intercept, slope / 2, se, se / 2, r2)
+
+
+@dataclass(frozen=True)
+class HurstEstimate:
+    """One Hurst estimate and the Monte Carlo standard error of that estimator.
+
+    ``se_mc`` is the spread of the estimator across fractional Brownian paths of
+    the same length, not the ordinary least squares standard error. The skew
+    route is a deterministic fit and stores NaN. ``lags`` are grid steps for
+    the realised-variance route and maturities for the skew route. ``q`` is the
+    moment order. The skew route has no moment and stores NaN. ``method`` is
+    ``"gjr"`` or ``"skew"``. ``n_obs`` is the number of points that entered the fit.
+    """
+
+    H: float
+    se_mc: float
+    lags: np.ndarray
+    q: float
+    method: str
+    n_obs: int
+
+
+@dataclass(frozen=True)
+class RegimeVolEstimate:
+    """Hurst exponent and per-step vol of vol, with Monte Carlo standard errors.
+
+    ``nu_per_day`` comes from the intercept of ``m(2, Delta)`` on a unit-step
+    grid. For a daily series that step is one trading day. See the module note
+    for the factor of 2, and :func:`rbergomi_nu` for the annual rough Bergomi
+    coefficient. ``se_mc_H`` and ``se_mc_nu_per_day`` are the spreads of those
+    two estimators on fractional Brownian paths of the same length, at the
+    estimated ``(H, nu_per_day)``.
+    """
+
+    H: float
+    nu_per_day: float
+    se_mc_H: float
+    se_mc_nu_per_day: float
+    lags: np.ndarray
+    n_obs: int
+
+    def to_rbergomi_nu(self, trading_days: float = 252.0) -> float:
+        """Annual rough Bergomi vol of vol. See :func:`rbergomi_nu`."""
+        return rbergomi_nu(self.nu_per_day, self.H, trading_days)
+
+
+def hurst_estimate(
+    x: np.ndarray,
+    q: float = 2.0,
+    lags: Sequence[int] | np.ndarray = range(1, 51),
+    *,
+    seed: int,
+    reps: int = 40,
+    method: str = "gjr",
+) -> HurstEstimate:
+    """GJR estimate with the Monte Carlo standard error in place of the regression SE."""
+    if method != "gjr":
+        raise ValueError(f"hurst_estimate method must be 'gjr', got {method!r}")
+    x = np.asarray(x, dtype=np.float64)
+    fit = hurst_gjr(x, q, lags)
+    se_mc = monte_carlo_se(fit.H, len(x) - 1, q, fit.lags, reps, seed=seed)
+    return HurstEstimate(fit.H, se_mc, fit.lags, float(q), method, int(len(x)))
+
+
+def lag_window_sensitivity(
+    x: np.ndarray,
+    windows: Sequence[tuple[int, int]] = ((1, 10), (1, 20), (1, 50), (1, 100), (1, 200)),
+    q: float = 2.0,
+    *,
+    seed: int,
+    reps: int = 40,
+) -> tuple[HurstEstimate, ...]:
+    """One GJR estimate per inclusive lag window ``(low, high)``, in grid steps."""
+    x = np.asarray(x, dtype=np.float64)
+    out = []
+    for low, high in windows:
+        if low < 1 or high <= low:
+            raise ValueError(f"lag window must satisfy 1 <= low < high, got {(low, high)}")
+        if high >= len(x):
+            continue
+        out.append(hurst_estimate(x, q, range(int(low), int(high) + 1), seed=seed, reps=reps))
+    if not out:
+        raise ValueError(f"no lag window fits a series of length {len(x)}")
+    return tuple(out)
+
+
+def hurst_from_skew(
+    T: np.ndarray,
+    psi: np.ndarray,
+    T_window: tuple[float, float] | None = None,
+) -> HurstEstimate:
+    """``H = 1/2 - alpha`` from ``|psi| = A T^{-alpha}``.
+
+    ``T_window`` is ``(low, high)`` in years, inclusive. ``None`` uses every
+    finite positive maturity with a nonzero skew. The fit is deterministic, so
+    ``se_mc`` is NaN. A market number should be read next to the range from
+    :func:`skew_window_sensitivity`.
+    """
+    T = np.asarray(T, dtype=np.float64).reshape(-1)
+    psi = np.asarray(psi, dtype=np.float64).reshape(-1)
+    if T.shape != psi.shape:
+        raise ValueError(f"T and psi must have the same length, got {T.shape} and {psi.shape}")
+    use = np.isfinite(T) & np.isfinite(psi) & (T > 0.0) & (psi != 0.0)
+    if T_window is not None:
+        low, high = (float(T_window[0]), float(T_window[1]))
+        if low >= high:
+            raise ValueError(f"T_window must have low < high, got {T_window}")
+        use = use & (T >= low) & (T <= high)
+    if int(use.sum()) < 2:
+        raise ValueError("need at least two maturities with a nonzero skew in the window")
+    maturity = T[use]
+    slope, _intercept, _se, _r2 = _ols(np.log(maturity), np.log(np.abs(psi[use])))
+    # slope = d log|psi| / d log T = -alpha, and alpha = 1/2 - H.
+    return HurstEstimate(
+        H=float(0.5 + slope),
+        se_mc=float("nan"),
+        lags=maturity,
+        q=float("nan"),
+        method="skew",
+        n_obs=int(maturity.size),
+    )
+
+
+def skew_window_sensitivity(
+    T: np.ndarray,
+    psi: np.ndarray,
+    windows: Sequence[tuple[float, float] | None],
+) -> tuple[HurstEstimate, ...]:
+    """``hurst_from_skew`` on each maturity window. ``None`` means every expiry."""
+    return tuple(hurst_from_skew(T, psi, window) for window in windows)
+
+
+def c_hurst(H: float) -> float:
+    """``c_H = Gamma(H + 1/2) Gamma(2 - 2H) / (2 H Gamma(3/2 - H))``.
+
+    This is the reciprocal square of the Mandelbrot-Van Ness constant, the
+    constant that makes fractional Brownian motion have variance ``t^{2H}``.
+    Rough Bergomi multiplies the kernel ``(t - s)^{H - 1/2}`` by ``sqrt(2H)``,
+    so a stationary increment of ``log v`` has standard deviation
+    ``nu sqrt(2 H c_H) dt^H``. At ``H = 1/2`` the factor equals 1.
+    """
+    h = float(H)
+    if not 0.0 < h < 1.0:
+        raise ValueError(f"H must be in (0, 1), got {H}")
+    return math.gamma(h + 0.5) * math.gamma(2.0 - 2.0 * h) / (2.0 * h * math.gamma(1.5 - h))
+
+
+def vol_of_vol_from_intercept(intercept: float) -> float:
+    """``nu_per_day = 2 exp(intercept / 2)`` for a unit-step log-volatility series.
+
+    The regression is ``log m(2, Delta) = intercept + 2 H log Delta``, with
+    ``Delta`` in grid steps. See the module note. The result is per step, which
+    is one trading day for a daily series, not the annual rough Bergomi ``nu``.
+    """
+    return float(2.0 * np.exp(0.5 * float(intercept)))
+
+
+def rbergomi_nu(nu_per_day: float, H: float, trading_days: float = 252.0) -> float:
+    """Annual rough Bergomi vol of vol from a per-step increment coefficient.
+
+    The estimator measures ``E[(log v_{t+Delta} - log v_t)^2]``, with ``Delta``
+    in grid steps, not ``Var(log v_t)``. In rough Bergomi that increment has
+    standard deviation ``nu sqrt(2 H c_H) dt^H`` in the stationary limit, and
+    ``dt = 1 / trading_days`` of a year. Therefore
+
+        nu = nu_per_day * trading_days**H / sqrt(2 H c_H).
+
+    At ``H = 1/2`` the square root is 1 and the two scalings agree. See
+    :func:`c_hurst`.
+    """
+    days = float(trading_days)
+    if not days > 0.0:
+        raise ValueError(f"trading_days must be positive, got {trading_days}")
+    h = float(H)
+    return float(nu_per_day) * days**h / math.sqrt(2.0 * h * c_hurst(h))
+
+
+def regime_estimate(
+    x: np.ndarray,
+    lags: Sequence[int] | np.ndarray = range(1, 51),
+    *,
+    seed: int,
+    reps: int = 40,
+) -> RegimeVolEstimate:
+    """``(H, nu_per_day)`` on one regime, with Monte Carlo standard errors.
+
+    The series must stay inside one regime for every lag in the window.
+    Two long blocks, estimated separately, are the two-regime case.
+    """
+    from roughvol.fbm import fbm
+
+    if reps < 2:
+        raise ValueError(f"reps must be at least 2, got {reps}")
+    x = np.asarray(x, dtype=np.float64)
+    fit = hurst_gjr(x, 2.0, lags)
+    nu = vol_of_vol_from_intercept(fit.intercept)
+    n = len(x) - 1
+    H_draw = float(np.clip(fit.H, 0.01, 0.99))
+    paths = fbm(H_draw, n, float(n), reps, seed=seed)
+    heights = []
+    vols = []
+    for path in paths:
+        trial = hurst_gjr((nu / 2.0) * path, 2.0, fit.lags)
+        heights.append(trial.H)
+        vols.append(vol_of_vol_from_intercept(trial.intercept))
+    return RegimeVolEstimate(
+        H=fit.H,
+        nu_per_day=nu,
+        se_mc_H=float(np.std(heights, ddof=1)),
+        se_mc_nu_per_day=float(np.std(vols, ddof=1)),
+        lags=fit.lags,
+        n_obs=int(len(x)),
+    )
+
+
+def regime_estimates(
+    x: np.ndarray,
+    labels: np.ndarray,
+    lags: Sequence[int] | np.ndarray = range(1, 51),
+    *,
+    seed: int,
+    reps: int = 40,
+) -> dict:
+    """``(H, nu_per_day)`` on the longest constant run of each label.
+
+    A lag that would cross into another label is not used: the structure
+    function is computed inside the run only.
+    """
+    x = np.asarray(x, dtype=np.float64)
+    labels = np.asarray(labels)
+    if labels.shape != x.shape:
+        raise ValueError(f"labels shape {labels.shape} does not match the series {x.shape}")
+    if labels.size < 3:
+        raise ValueError("labels must cover the series")
+    change = np.flatnonzero(labels[1:] != labels[:-1]) + 1
+    bounds = np.concatenate(([0], change, [labels.size]))
+    best: dict = {}
+    for start, end in zip(bounds[:-1], bounds[1:], strict=True):
+        key = labels[start].item() if hasattr(labels[start], "item") else labels[start]
+        if key not in best or (end - start) > (best[key][1] - best[key][0]):
+            best[key] = (int(start), int(end))
+    return {
+        key: regime_estimate(x[start:end], lags, seed=seed + i, reps=reps)
+        for i, (key, (start, end)) in enumerate(sorted(best.items(), key=lambda item: str(item[0])))
+    }
 
 
 def monte_carlo_se(
