@@ -22,14 +22,16 @@ of the same length and H. `HurstEstimate` carries that Monte Carlo standard erro
 The regression standard error stays on `HurstFit` and is not the headline error.
 
 The skew route fits `|psi| = A T^{-alpha}` and returns `H = 1/2 - alpha`. That fit is
-deterministic, so its Monte Carlo standard error is 0. The uncertainty to report with
-a market skew is the change in H across maturity windows.
+deterministic, so its Monte Carlo standard error is NaN. The uncertainty to report with
+a market skew is the range of H across maturity windows.
 
-Per-regime vol of vol uses the intercept of `m(2, Delta)`. If `log sigma = (nu / 2) B`
+Per-regime vol of vol uses the intercept of `m(2, Delta)`. If `log sigma = (nu_per_day / 2) B`
 with `B` standard fractional Brownian motion in units of one grid step
-(`Var(B_t) = t^{2H}`), then `m(2, Delta) = (nu / 2)^2 Delta^{2H}`. The regression
-`log m = a + 2 H log Delta` has `nu = 2 exp(a / 2)`. This is the scaling for
-`log sigma = log v / 2` when `log v` has vol of vol `nu`.
+(`Var(B_t) = t^{2H}`), then `m(2, Delta) = (nu_per_day / 2)^2 Delta^{2H}`. The regression
+`log m = a + 2 H log Delta` has `nu_per_day = 2 exp(a / 2)`. This is the scaling for
+`log sigma = log v / 2` when `log v` has vol of vol `nu_per_day` per grid step. On a
+daily series the step is one trading day. Rough Bergomi takes time in years, so its
+`nu` is `nu_per_day * trading_days**H` with `trading_days = 252`.
 
 `hurst_variogram2` is a cross-check built on second-order increments
 x_{t + 2 Delta} - 2 x_{t + Delta} + x_t, whose variance also scales like Delta^(2H). It is
@@ -138,11 +140,11 @@ class HurstEstimate:
     """One Hurst estimate and the Monte Carlo standard error of that estimator.
 
     ``se_mc`` is the spread of the estimator across fractional Brownian paths of
-    the same length, not the ordinary least squares standard error. ``lags`` are
-    grid steps for the realised-variance route and maturities for the skew
-    route. ``q`` is the moment order. The skew route has no moment and stores
-    NaN. ``method`` is ``"gjr"`` or ``"skew"``. ``n_obs`` is the number of
-    points that entered the fit.
+    the same length, not the ordinary least squares standard error. The skew
+    route is a deterministic fit and stores NaN. ``lags`` are grid steps for
+    the realised-variance route and maturities for the skew route. ``q`` is the
+    moment order. The skew route has no moment and stores NaN. ``method`` is
+    ``"gjr"`` or ``"skew"``. ``n_obs`` is the number of points that entered the fit.
     """
 
     H: float
@@ -155,20 +157,26 @@ class HurstEstimate:
 
 @dataclass(frozen=True)
 class RegimeVolEstimate:
-    """Hurst exponent and vol of vol on one regime, with Monte Carlo standard errors.
+    """Hurst exponent and per-step vol of vol, with Monte Carlo standard errors.
 
-    ``nu`` comes from the intercept of ``m(2, Delta)`` on a unit-step grid.
-    See the module note for the factor of 2. ``se_mc_H`` and ``se_mc_nu`` are
-    the spreads of those two estimators on fractional Brownian paths of the
-    same length, at the estimated ``(H, nu)``.
+    ``nu_per_day`` comes from the intercept of ``m(2, Delta)`` on a unit-step
+    grid. For a daily series that step is one trading day. See the module note
+    for the factor of 2, and :func:`rbergomi_nu` for the annual rough Bergomi
+    coefficient. ``se_mc_H`` and ``se_mc_nu_per_day`` are the spreads of those
+    two estimators on fractional Brownian paths of the same length, at the
+    estimated ``(H, nu_per_day)``.
     """
 
     H: float
-    nu: float
+    nu_per_day: float
     se_mc_H: float
-    se_mc_nu: float
+    se_mc_nu_per_day: float
     lags: np.ndarray
     n_obs: int
+
+    def to_rbergomi_nu(self, trading_days: float = 252.0) -> float:
+        """Annual rough Bergomi vol of vol. See :func:`rbergomi_nu`."""
+        return rbergomi_nu(self.nu_per_day, self.H, trading_days)
 
 
 def hurst_estimate(
@@ -220,7 +228,7 @@ def hurst_from_skew(
 
     ``T_window`` is ``(low, high)`` in years, inclusive. ``None`` uses every
     finite positive maturity with a nonzero skew. The fit is deterministic, so
-    ``se_mc`` is 0. A market number should be read next to
+    ``se_mc`` is NaN. A market number should be read next to the range from
     :func:`skew_window_sensitivity`.
     """
     T = np.asarray(T, dtype=np.float64).reshape(-1)
@@ -240,7 +248,7 @@ def hurst_from_skew(
     # slope = d log|psi| / d log T = -alpha, and alpha = 1/2 - H.
     return HurstEstimate(
         H=float(0.5 + slope),
-        se_mc=0.0,
+        se_mc=float("nan"),
         lags=maturity,
         q=float("nan"),
         method="skew",
@@ -258,12 +266,27 @@ def skew_window_sensitivity(
 
 
 def vol_of_vol_from_intercept(intercept: float) -> float:
-    """``nu = 2 exp(intercept / 2)`` for a unit-step log-volatility series.
+    """``nu_per_day = 2 exp(intercept / 2)`` for a unit-step log-volatility series.
 
     The regression is ``log m(2, Delta) = intercept + 2 H log Delta``, with
-    ``Delta`` in grid steps. See the module note.
+    ``Delta`` in grid steps. See the module note. The result is per step, which
+    is one trading day for a daily series, not the annual rough Bergomi ``nu``.
     """
     return float(2.0 * np.exp(0.5 * float(intercept)))
+
+
+def rbergomi_nu(nu_per_day: float, H: float, trading_days: float = 252.0) -> float:
+    """Annual rough Bergomi vol of vol from a per-step coefficient.
+
+    On a unit-step grid, ``log sigma = (nu_per_day / 2) B`` with
+    ``Var(B_t) = t^{2H}``. Rough Bergomi takes time in years and sets
+    ``Var(log v_t) = nu^2 t^{2H}``, with ``log v = 2 log sigma``. One year is
+    ``trading_days`` steps, so ``nu = nu_per_day * trading_days**H``.
+    """
+    days = float(trading_days)
+    if not days > 0.0:
+        raise ValueError(f"trading_days must be positive, got {trading_days}")
+    return float(nu_per_day) * days ** float(H)
 
 
 def regime_estimate(
@@ -273,7 +296,7 @@ def regime_estimate(
     seed: int,
     reps: int = 40,
 ) -> RegimeVolEstimate:
-    """``(H, nu)`` on one regime, with Monte Carlo standard errors.
+    """``(H, nu_per_day)`` on one regime, with Monte Carlo standard errors.
 
     The series must stay inside one regime for every lag in the window.
     Two long blocks, estimated separately, are the two-regime case.
@@ -296,9 +319,9 @@ def regime_estimate(
         vols.append(vol_of_vol_from_intercept(trial.intercept))
     return RegimeVolEstimate(
         H=fit.H,
-        nu=nu,
+        nu_per_day=nu,
         se_mc_H=float(np.std(heights, ddof=1)),
-        se_mc_nu=float(np.std(vols, ddof=1)),
+        se_mc_nu_per_day=float(np.std(vols, ddof=1)),
         lags=fit.lags,
         n_obs=int(len(x)),
     )
@@ -312,7 +335,7 @@ def regime_estimates(
     seed: int,
     reps: int = 40,
 ) -> dict:
-    """``(H, nu)`` on the longest constant run of each label.
+    """``(H, nu_per_day)`` on the longest constant run of each label.
 
     A lag that would cross into another label is not used: the structure
     function is computed inside the run only.

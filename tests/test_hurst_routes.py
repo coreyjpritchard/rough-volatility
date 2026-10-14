@@ -11,6 +11,7 @@ the 14 October 2026 chain. It is not a copied logarithm.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import numpy as np
@@ -61,7 +62,8 @@ def test_skew_route_recovers_exact_power_law(impl):
         window = impl.estimate.hurst_from_skew(maturities, psi, (0.05, 0.4))
         assert full.H == pytest.approx(H, abs=1e-10)
         assert window.H == pytest.approx(H, abs=1e-10)
-        assert full.se_mc == 0.0
+        assert math.isnan(full.se_mc)
+        assert math.isnan(window.se_mc)
         assert full.method == "skew"
         assert window.n_obs < full.n_obs
         assert full.n_obs == 15
@@ -70,17 +72,29 @@ def test_skew_route_recovers_exact_power_law(impl):
 def test_spx_skew_route_on_the_committed_term_structure(impl):
     """All 40 expiries of the recomputed 14 October 2026 SPX term structure.
 
-    H = 0.1671745060 is the output of this pull request's fit, checked here
-    to 1e-10 so a silent edit of the table is visible.
+    H = 0.1671745060 is the all-expiry fit, checked here to 1e-10 so a silent
+    edit of the table is visible. The same points on the prechosen windows
+    span 0.115277 to 0.207468. Each fit is deterministic, so se_mc is NaN.
     """
     rows = np.genfromtxt(TERM, delimiter=",", names=True)
-    estimate = impl.estimate.hurst_from_skew(rows["T"], rows["skew"])
-    assert estimate.n_obs == 40
-    assert estimate.H == pytest.approx(0.16717450602652617, abs=1e-10)
+    windows = (
+        None,
+        (1.0 / 252.0, 1.0 / 12.0),
+        (1.0 / 52.0, 0.25),
+        (1.0 / 12.0, 1.0),
+        (1.0 / 52.0, 1.0),
+    )
+    fits = impl.estimate.skew_window_sensitivity(rows["T"], rows["skew"], windows)
+    heights = [fit.H for fit in fits]
+    assert fits[0].n_obs == 40
+    assert heights[0] == pytest.approx(0.16717450602652617, abs=1e-10)
+    assert min(heights) == pytest.approx(0.11527725839990882, abs=1e-10)
+    assert max(heights) == pytest.approx(0.20746848517500888, abs=1e-10)
+    assert all(math.isnan(fit.se_mc) for fit in fits)
 
 
 def test_two_regimes_recover_nu_within_monte_carlo_se(impl):
-    """Two blocks, H = 0.15, nu = 0.6 and 1.8. Twenty paths, 4,096 steps each.
+    """Two blocks, H = 0.15, nu_per_day = 0.6 and 1.8. Twenty paths, 4,096 steps each.
 
     The Monte Carlo SE is the standard deviation of the twenty estimates.
     Increments that would cross the join are not used: each label is estimated
@@ -102,11 +116,37 @@ def test_two_regimes_recover_nu_within_monte_carlo_se(impl):
         labels = np.concatenate([np.full(N + 1, i, dtype=int) for i in range(2)])
         fits = impl.estimate.regime_estimates(series, labels, LAGS, seed=SEED + 50 + r, reps=8)
         for i in range(2):
-            found[i].append(fits[i].nu)
+            found[i].append(fits[i].nu_per_day)
             heights[i].append(fits[i].H)
-            reported[i].append(fits[i].se_mc_nu)
+            reported[i].append(fits[i].se_mc_nu_per_day)
     for i, nu in enumerate(nus):
         mean, se_mc = _spread_band(found[i], nu)
         _spread_band(heights[i], H)
         assert mean == pytest.approx(nu, abs=se_mc)
         assert abs(mean - nu) < float(np.mean(reported[i]))
+
+
+def test_nu_per_day_converts_to_annual_rbergomi_nu(impl):
+    """Per-step vol of vol scales by trading_days**H. One year is 252 days.
+
+    On rv5 at lags 1 to 50, nu_per_day = 0.6997318719333629 and
+    H = 0.1475349541453704, so the rough Bergomi coefficient is
+    1.5820571746999603.
+    """
+    nu_per_day = 0.6997318719333629
+    H = 0.1475349541453704
+    annual = impl.estimate.rbergomi_nu(nu_per_day, H)
+    assert annual == pytest.approx(nu_per_day * 252.0**H)
+    assert annual == pytest.approx(1.5820571746999603, abs=1e-12)
+    assert impl.estimate.rbergomi_nu(1.0, 0.5, trading_days=256) == pytest.approx(16.0)
+    estimate = impl.estimate.RegimeVolEstimate(
+        H=H,
+        nu_per_day=nu_per_day,
+        se_mc_H=0.01,
+        se_mc_nu_per_day=0.01,
+        lags=np.array([1.0, 2.0]),
+        n_obs=10,
+    )
+    assert estimate.to_rbergomi_nu() == pytest.approx(annual)
+    with pytest.raises(ValueError, match="trading_days"):
+        impl.estimate.rbergomi_nu(1.0, 0.1, trading_days=0.0)

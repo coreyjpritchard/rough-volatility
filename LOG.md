@@ -21,13 +21,18 @@ Lag window, q = 2. The error is that Monte Carlo SE.
 | Parkinson, n = 6,731 | 0.0793 (0.0046) | 0.0844 (0.0042) | 0.0900 (0.0066) | 0.0920 (0.0085) | 0.0830 (0.0113) |
 | Garman-Klass, n = 6,731 | 0.0882 (0.0050) | 0.0866 (0.0060) | 0.0916 (0.0060) | 0.0925 (0.0068) | 0.0824 (0.0085) |
 
-On rv5 at lags 1 to 50 the structure-function intercept maps to nu = 0.6997 with
-Monte Carlo SE 0.0133, under log sigma = (nu / 2) times unit-step fBm. That is
-not a price calibration of rough Bergomi.
+On rv5 at lags 1 to 50 the structure-function intercept maps to nu_per_day = 0.699732
+with Monte Carlo SE 0.0133, under log sigma = (nu_per_day / 2) times unit-step fBm,
+at H = 0.147535. That coefficient is per trading day. Rough Bergomi takes time in
+years, with Var(log v_t) = nu^2 t^{2H}, so nu = nu_per_day * 252^H = 1.582057.
+That is not a price calibration of rough Bergomi.
 
 The SPX skew was refit from the 14 October 2026 chain (40 expiries, parity
 forwards, quadratic ATM skew on |k| <= max(0.15 sqrt(T), 0.01)). All 40 expiries
-give |psi| = 0.305112 T^{-0.332825}, so H = 1/2 - 0.332825 = 0.167175. The first
+give |psi| = 0.305112 T^{-0.332825}, so H = 1/2 - 0.332825 = 0.167175. The skew
+fit is deterministic, so se_mc is NaN. Across the five windows below, H runs from
+0.115277 to 0.207468, and that range is the uncertainty to report with 0.167175.
+The first
 two expiries have discount factors above 1 and are kept. Their skews are -2.9648
 at T = 0.001139 and -1.9889 at T = 0.003879. The last expiry, T = 0.9628, has
 skew -0.2815.
@@ -46,13 +51,15 @@ The figure is `docs/figures/rvc_routes.png`. It has no reference line at a true 
 
 On fBm, 4,096 steps, 40 paths, lags 1 to 50, the mean estimate for H in
 {0.05, 0.15, 0.5} lies inside the path-to-path standard deviation. An exact
-power law |psi| = A T^{-(1/2 - H)} is recovered to 1e-10. Two synthetic regimes
-at H = 0.15, nu = 0.6 and 1.8, twenty paths of 4,096 steps, each recover nu
-inside that Monte Carlo SE. The join between the blocks is not used.
+power law |psi| = A T^{-(1/2 - H)} is recovered to 1e-10, and se_mc on that route
+is NaN. Two synthetic regimes at H = 0.15, nu_per_day = 0.6 and 1.8, twenty paths
+of 4,096 steps, each recover nu_per_day inside that Monte Carlo SE. The join
+between the blocks is not used.
 
-**Surprised.** The all-expiry skew H is 0.167175, and the window 1/52 to 1/4,
-the one used for the rough Bergomi exponent, gives 0.207468. That is 0.040
-higher. The window 1/12 to 1 gives 0.115277, which is 0.052 lower. Dropping
+**Surprised.** The all-expiry skew H is 0.167175, and the five windows span
+0.115277 to 0.207468. The window 1/52 to 1/4, the one used for the rough Bergomi
+exponent, gives 0.207468. That is 0.040 higher. The window 1/12 to 1 gives
+0.115277, which is 0.052 lower. Dropping
 only the sub-week expiries (1/52 to 1, which also drops the two discount
 factors above 1) moves H by 0.005, to 0.161886. The front two points are not
 the gap. The next specification is a fit on a stated expiry set with the

@@ -89,7 +89,9 @@ def main() -> None:
             )
     nu_fit = regime_estimate(series["oxford-man"], range(1, 51), seed=SEED + 7, reps=REPS)
     print(
-        f"oxford-man nu={nu_fit.nu:.6f} se_mc_nu={nu_fit.se_mc_nu:.6f} "
+        f"oxford-man nu_per_day={nu_fit.nu_per_day:.6f} "
+        f"se_mc_nu_per_day={nu_fit.se_mc_nu_per_day:.6f} "
+        f"rbergomi_nu={nu_fit.to_rbergomi_nu():.6f} "
         f"H={nu_fit.H:.6f} se_mc_H={nu_fit.se_mc_H:.6f} n={nu_fit.n_obs}"
     )
 
