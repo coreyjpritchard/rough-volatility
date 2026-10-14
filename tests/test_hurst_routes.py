@@ -160,6 +160,33 @@ def test_nu_per_day_converts_to_annual_rbergomi_nu(impl):
         impl.estimate.rbergomi_nu(1.0, 0.1, trading_days=0.0)
 
 
+def test_monte_carlo_se_of_h_propagates_into_rbergomi_nu(impl):
+    """The H error is carried by a central difference, with nu_per_day fixed.
+
+    nu(H) = nu_per_day * 252^H / sqrt(2 H c_H). The derivative is
+    (nu(H + ε) - nu(H - ε)) / (2ε) at ε = 1e-6. The standard error is the
+    lags 1 to 50 cell of docs/figures/rvc_routes.csv. The product is the
+    uncertainty reported with 1.328276.
+    """
+    nu_per_day = 0.6997318719333629
+    H = 0.14753495414537035
+    se_H = 0.013373510585712234
+    eps = 1e-6
+
+    def nu(h: float) -> float:
+        return impl.estimate.rbergomi_nu(nu_per_day, h)
+
+    slope = (nu(H + eps) - nu(H - eps)) / (2.0 * eps)
+    carried = abs(slope) * se_H
+    assert nu(H) == pytest.approx(1.3282759090799114, abs=1e-12)
+    assert slope == pytest.approx(8.61604592, abs=1e-6)
+    assert carried == pytest.approx(0.11522678, abs=1e-8)
+    assert nu(H + se_H) == pytest.approx(1.44830641, abs=1e-8)
+    assert nu(H - se_H) == pytest.approx(1.21761606, abs=1e-8)
+    assert nu(0.12249034699599022) == pytest.approx(1.128162, abs=5e-7)
+    assert nu(0.1582991406377058) == pytest.approx(1.424117, abs=5e-7)
+
+
 def test_simulated_rbergomi_nu_is_recovered_within_the_replication_bound(impl):
     """H = 0.15, nu = 1.5, 16 paths, 6 years of daily steps, lags 1 to 20.
 
