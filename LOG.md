@@ -3,7 +3,52 @@
 Dated entries, newest first. What was learned, what surprised, open questions.
 
 **Current state:** session 00 built, not yet worked through. RV-a, RV-b and RV-c are
-implemented and not merged. **Next:** session 01, when does the estimator lie.
+on main. Rough Bergomi returns the hybrid-scheme components `(dW, I_1, ..., I_kappa)`
+on the volatility child. **Next:** session 01, when does the estimator lie.
+
+## 2026-10-14: near-field components, so a step-dependent nu can rebuild Y
+
+**Found.** `RoughBergomi.volterra_components` returns the hybrid scheme's
+Gaussian vector on each step, shape `(n_paths, n_steps, kappa + 1)`, last
+axis `(dW, I_1, ..., I_kappa)`. The seed is the volatility child. The draw
+is `hybrid_scheme_rng` on `generator(seed)`, with no further spawn, at the
+model's kappa. `volterra_increments` is column 0 of that array. The kernel
+weights stay in `power_kernel_weights`.
+
+A constant nu multiplies every step's contribution: `nu * I_k` on lags up
+to kappa, and `nu * w[k - 1] * dW` beyond it. At H = 0.1, kappa 1 and
+kappa 2, parent seed 11, 6 paths and 8 steps, the unscaled sum is bitwise
+identical to the Y inside `simulate`. The sum with nu = 1.5 matches
+`nu * Y` to 1e-15, and the variance path matches `simulate` to 1e-15. At
+H = 1/2 every `I_k` equals `dW`, and the cumsum of `dW` is Y exactly.
+
+The lag-1 Riemann weight keeps `2H / (H + 1/2)^2` of `Var(I_1)`. At
+H = 0.1 that is 5/9, so 4/9 of each step's own-term variance is missing
+from a dW-only rebuild. On 64 steps to time 1, nu = 1.5, the expectation
+under that Riemann covariance is E[v] / xi0 = 0.803884 at the horizon.
+
+With the components, E[v] = xi0 at H = 0.1, kappa = 1, nu = 1.5, flat
+xi0 = 0.04. Sample: 2,000 paths, 64 steps, 4 replications, seeds
+20261014 + 8000 + r. The largest |z| is 4.0467, and the max bound at 64
+nodes is 4.3197. The replication mean is -0.2913, the sample standard
+deviation is 0.4945, and the bound 3.5 sd / sqrt(R) is 0.8653.
+
+## 2026-10-14: Wiener increments on the volatility child
+
+**Found.** `RoughBergomi.volterra_increments` returns the hybrid scheme's dW
+and not the kernel weights. The seed is already the volatility child. The
+draw is `hybrid_scheme_rng` on `generator(seed)`, with no further spawn, at
+the model's kappa. On the uniform grid `simulate` accepts, that array is the
+dW inside `simulate` for the same child. The match is exact at H = 0.1 with
+kappa = 2, and at H = 1/2 with kappa = 1: parent seed 11, 6 paths, 8 steps
+on [0, 0.5]. Rebuilding the spot from those increments recovers `simulate`'s
+Z. A grid that turns back, and a grid that is not 1-d, each raise ValueError.
+
+The variance of each increment equals the step length. On 2,000 paths, 64
+steps, 4 replications, seeds 20261014 + 7000 + r, H = 0.1, kappa = 1, the
+second-moment z scores have a largest absolute value of 3.1455. The max
+bound at 64 nodes is 4.3197. The replication mean is -0.0920, the sample
+standard deviation is 0.1474, and the bound 3.5 sd / sqrt(R) is 0.2580.
 
 ## 2026-10-14: RV-c, Hurst by the realised-variance route and by the skew
 

@@ -13,6 +13,18 @@ The factor sqrt(2H) puts the variance of nu sqrt(2H) Y back to nu^2 t^{2H}, so t
 
 xi0 is a positive level, or a function of time. A host can also pass state["xi"], a scalar or a curve on xi_tenors. That starts a fresh model on the curve.
 
+## Volterra components
+
+`volterra_components` returns the hybrid scheme's Gaussian vector on each step, and not the kernel weights. The seed argument is already the volatility child, the same child `simulate` hands to `hybrid_scheme_rng`. The method calls `generator` on that seed and does not spawn again. It draws at the model's kappa. The time grid is the one `simulate` accepts: it starts at 0, is strictly increasing, and is equally spaced. A grid that turns back raises `ValueError`.
+
+The result has shape `(n_paths, n_steps, kappa + 1)`. The last axis is `(dW, I_1, ..., I_kappa)`. Column 0 of that axis is the Wiener increment, `volterra_increments` returns that column alone, and its variance is the step length. `I_k` is the exact integral of `(k dt - tau)^{H - 1/2}` on the step. At H = 1/2 the kernel is 1, so every `I_k` equals `dW`, and the scheme draws one normal per step. When the Hurst argument equals the model's H, these are the components that build Y inside `simulate`.
+
+The weights are `power_kernel_weights(H, n, T, kappa=kappa)`. The first kappa of them are 0, because those lags are the exact block. Write `nu_j` for a vol of vol that is constant on step j and may change from step to step. The contribution of step j at lag k, which lands at time index j + k when that index is still on the grid, is `nu_j * I_k` for k at most kappa, and `nu_j * w[k - 1] * dW` for k beyond kappa. Y at that time is the sum of the contributions that land there, and Y at 0 is 0.
+
+A constant nu factors out of the sum. Dividing by nu returns the Riemann-Liouville path inside `simulate`, and the variance exponential uses the compensator `nu^2 t^{2H} / 2`. That compensator is the exact variance of the integral, the one `simulate` uses. When `nu_j` changes with the step, the same exact compensator on grid time i is the sum over earlier steps j of `nu_j^2 (k^{2H} - (k - 1)^{2H}) dt^{2H} / 2`, where k = i - j is the lag in steps and dt is the step length. With a constant nu the sum telescopes back to `nu^2 t^{2H} / 2`.
+
+`dW` alone does not rebuild Y. The lag-1 Riemann weight keeps `2H / (H + 1/2)^2` of `Var(I_1)`. At H = 0.1 that ratio is 5/9, so 4/9 of each step's own-term variance is missing. The compensator still subtracts the full `nu^2 t^{2H} / 2`. On 64 steps to time 1, with nu = 1.5, the expectation under the Riemann-scheme covariance is `E[v] / xi0 = 0.803884` at the horizon. The components put `I_1` back, and `E[v]` returns to `xi0` within the z-rule.
+
 ## The forward variance curve
 
 For u > t,
