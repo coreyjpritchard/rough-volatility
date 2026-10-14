@@ -127,17 +127,25 @@ def test_two_regimes_recover_nu_within_monte_carlo_se(impl):
 
 
 def test_nu_per_day_converts_to_annual_rbergomi_nu(impl):
-    """Per-step vol of vol scales by trading_days**H. One year is 252 days.
+    """The map uses the increment factor sqrt(2 H c_H), at an H other than 1/2.
 
     On rv5 at lags 1 to 50, nu_per_day = 0.6997318719333629 and
-    H = 0.1475349541453704, so the rough Bergomi coefficient is
-    1.5820571746999603.
+    H = 0.1475349541453704. Dividing by sqrt(2 H c_H) gives
+    1.3282759090799114. The level scaling nu_per_day * 252^H is 1.582057
+    and is a different number at this H. At H = 1/2 the factor is 1, so
+    that case cannot tell the two formulas apart.
     """
     nu_per_day = 0.6997318719333629
     H = 0.1475349541453704
     annual = impl.estimate.rbergomi_nu(nu_per_day, H)
-    assert annual == pytest.approx(nu_per_day * 252.0**H)
-    assert annual == pytest.approx(1.5820571746999603, abs=1e-12)
+    factor = math.sqrt(2.0 * H * impl.estimate.c_hurst(H))
+    level = nu_per_day * 252.0**H
+    assert H != pytest.approx(0.5)
+    assert factor > 1.0
+    assert annual == pytest.approx(level / factor)
+    assert annual == pytest.approx(1.3282759090799114, abs=1e-12)
+    assert abs(annual - level) > 0.2
+    assert impl.estimate.c_hurst(0.5) == pytest.approx(1.0)
     assert impl.estimate.rbergomi_nu(1.0, 0.5, trading_days=256) == pytest.approx(16.0)
     estimate = impl.estimate.RegimeVolEstimate(
         H=H,
@@ -150,3 +158,38 @@ def test_nu_per_day_converts_to_annual_rbergomi_nu(impl):
     assert estimate.to_rbergomi_nu() == pytest.approx(annual)
     with pytest.raises(ValueError, match="trading_days"):
         impl.estimate.rbergomi_nu(1.0, 0.1, trading_days=0.0)
+
+
+def test_simulated_rbergomi_nu_is_recovered_within_the_replication_bound(impl):
+    """H = 0.15, nu = 1.5, 16 paths, 6 years of daily steps, lags 1 to 20.
+
+    The series is log sigma = log v / 2. The converter is applied at the
+    simulated H. The band is the replication bound, 3.5 standard errors of
+    the mean across the 16 paths. The level scaling, without sqrt(2 H c_H),
+    falls outside that band.
+    """
+    from tests.zrule import check_replication_means
+
+    H = 0.15
+    nu = 1.5
+    paths = 16
+    years = 6
+    steps = 252 * years
+    model = impl.rbergomi.RoughBergomi(
+        H=H, nu=nu, rho=-0.7, xi0=0.04, n_steps=steps, n_paths=paths, kappa=1
+    )
+    times = np.linspace(0.0, float(years), steps + 1)
+    variance = model.simulate(paths, times, seed=SEED).state["v"]
+    lags = range(1, 21)
+    recovered = []
+    level = []
+    for row in 0.5 * np.log(variance):
+        fit = impl.estimate.hurst_gjr(row, 2.0, lags)
+        nu_per_day = impl.estimate.vol_of_vol_from_intercept(fit.intercept)
+        recovered.append(impl.estimate.rbergomi_nu(nu_per_day, H))
+        level.append(nu_per_day * 252.0**H)
+    recovered = np.asarray(recovered, dtype=np.float64)
+    level = np.asarray(level, dtype=np.float64)
+    failure = check_replication_means(recovered - nu)
+    assert failure is None, failure
+    assert check_replication_means(level - nu) is not None

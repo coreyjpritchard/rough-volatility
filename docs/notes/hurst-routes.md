@@ -18,7 +18,7 @@ On one regime, log m(2, Delta) = a + 2 H log Delta, with Delta in grid steps. If
 
     m(2, Delta) = (nu_per_day / 2)^2 Delta^{2H},    nu_per_day = 2 exp(a / 2).
 
-The factor 1/2 is log sigma = log v / 2, so nu_per_day is the vol of vol of variance on a grid whose step is one trading day. On rv5 at lags 1 to 50 this intercept gives nu_per_day = 0.699732 with Monte Carlo standard error 0.0133, at H = 0.147535. Rough Bergomi takes time in years and sets Var(log v_t) = nu^2 t^{2H}. One year is 252 trading days, so nu = nu_per_day * 252^H = 1.582057. That matches the second-moment scaling of the series after the change of time unit. It is not a fit of rough Bergomi to option prices.
+The factor 1/2 is log sigma = log v / 2, so nu_per_day is the vol of vol of an increment of variance, on a grid whose step is one trading day. The regression sees E[(log v_{t+Delta} - log v_t)^2], not Var(log v_t). On rv5 at lags 1 to 50 this intercept gives nu_per_day = 0.699732 with Monte Carlo standard error 0.0133, at H = 0.147535. In rough Bergomi the same increment, once time is in years, has standard deviation nu sqrt(2 H c_H) dt^H. The constant is c_H = Gamma(H + 1/2) Gamma(2 - 2H) / (2 H Gamma(3/2 - H)), the reciprocal square of the Mandelbrot-Van Ness constant. One year is 252 trading days, so nu = nu_per_day * 252^H / sqrt(2 H c_H) = 1.328276. At this H the factor sqrt(2 H c_H) is 1.191, and the level scaling nu_per_day * 252^H = 1.582057 is a different quantity. At H = 1/2 the factor is 1 and the two scalings agree. It is not a fit of rough Bergomi to option prices.
 
 A two-regime series is two long blocks. Each block is estimated on its own run, so a lag that would cross the join is not used.
 

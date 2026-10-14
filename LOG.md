@@ -23,9 +23,16 @@ Lag window, q = 2. The error is that Monte Carlo SE.
 
 On rv5 at lags 1 to 50 the structure-function intercept maps to nu_per_day = 0.699732
 with Monte Carlo SE 0.0133, under log sigma = (nu_per_day / 2) times unit-step fBm,
-at H = 0.147535. That coefficient is per trading day. Rough Bergomi takes time in
-years, with Var(log v_t) = nu^2 t^{2H}, so nu = nu_per_day * 252^H = 1.582057.
-That is not a price calibration of rough Bergomi.
+at H = 0.147535. That coefficient is the scaling of increments of log v over a lag,
+per trading day. It is not Var(log v_t). In rough Bergomi a stationary increment of
+log v has standard deviation nu sqrt(2 H c_H) dt^H, with
+c_H = Gamma(H + 1/2) Gamma(2 - 2H) / (2 H Gamma(3/2 - H)). One year is 252 trading
+days, so nu = nu_per_day * 252^H / sqrt(2 H c_H) = 1.328276. The level scaling
+nu_per_day * 252^H is 1.582057, which is the variance of the level and not this
+increment. A simulation at H = 0.15 and nu = 1.5, 16 daily paths of 6 years, lags
+1 to 20, recovers a mean of 1.510. The path standard deviation is 0.033, and the
+gap of 0.010 sits inside the replication bound of 3.5 standard errors. That is not
+a price calibration of rough Bergomi.
 
 The SPX skew was refit from the 14 October 2026 chain (40 expiries, parity
 forwards, quadratic ATM skew on |k| <= max(0.15 sqrt(T), 0.01)). All 40 expiries

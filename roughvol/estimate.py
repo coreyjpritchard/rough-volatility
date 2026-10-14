@@ -28,10 +28,11 @@ a market skew is the range of H across maturity windows.
 Per-regime vol of vol uses the intercept of `m(2, Delta)`. If `log sigma = (nu_per_day / 2) B`
 with `B` standard fractional Brownian motion in units of one grid step
 (`Var(B_t) = t^{2H}`), then `m(2, Delta) = (nu_per_day / 2)^2 Delta^{2H}`. The regression
-`log m = a + 2 H log Delta` has `nu_per_day = 2 exp(a / 2)`. This is the scaling for
-`log sigma = log v / 2` when `log v` has vol of vol `nu_per_day` per grid step. On a
-daily series the step is one trading day. Rough Bergomi takes time in years, so its
-`nu` is `nu_per_day * trading_days**H` with `trading_days = 252`.
+`log m = a + 2 H log Delta` has `nu_per_day = 2 exp(a / 2)`. That is the standard
+deviation of an increment of `log v = 2 log sigma`, not the variance of the level
+`log v_t`. Rough Bergomi's log variance has stationary increments of size
+`nu sqrt(2 H c_H) dt^H`, with `c_H` from :func:`c_hurst`. One year is 252 trading
+days, so `nu = nu_per_day * 252**H / sqrt(2 H c_H)`.
 
 `hurst_variogram2` is a cross-check built on second-order increments
 x_{t + 2 Delta} - 2 x_{t + Delta} + x_t, whose variance also scales like Delta^(2H). It is
@@ -41,6 +42,7 @@ estimators that Session 01 will look at.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -265,6 +267,21 @@ def skew_window_sensitivity(
     return tuple(hurst_from_skew(T, psi, window) for window in windows)
 
 
+def c_hurst(H: float) -> float:
+    """``c_H = Gamma(H + 1/2) Gamma(2 - 2H) / (2 H Gamma(3/2 - H))``.
+
+    This is the reciprocal square of the Mandelbrot-Van Ness constant, the
+    constant that makes fractional Brownian motion have variance ``t^{2H}``.
+    Rough Bergomi multiplies the kernel ``(t - s)^{H - 1/2}`` by ``sqrt(2H)``,
+    so a stationary increment of ``log v`` has standard deviation
+    ``nu sqrt(2 H c_H) dt^H``. At ``H = 1/2`` the factor equals 1.
+    """
+    h = float(H)
+    if not 0.0 < h < 1.0:
+        raise ValueError(f"H must be in (0, 1), got {H}")
+    return math.gamma(h + 0.5) * math.gamma(2.0 - 2.0 * h) / (2.0 * h * math.gamma(1.5 - h))
+
+
 def vol_of_vol_from_intercept(intercept: float) -> float:
     """``nu_per_day = 2 exp(intercept / 2)`` for a unit-step log-volatility series.
 
@@ -276,17 +293,23 @@ def vol_of_vol_from_intercept(intercept: float) -> float:
 
 
 def rbergomi_nu(nu_per_day: float, H: float, trading_days: float = 252.0) -> float:
-    """Annual rough Bergomi vol of vol from a per-step coefficient.
+    """Annual rough Bergomi vol of vol from a per-step increment coefficient.
 
-    On a unit-step grid, ``log sigma = (nu_per_day / 2) B`` with
-    ``Var(B_t) = t^{2H}``. Rough Bergomi takes time in years and sets
-    ``Var(log v_t) = nu^2 t^{2H}``, with ``log v = 2 log sigma``. One year is
-    ``trading_days`` steps, so ``nu = nu_per_day * trading_days**H``.
+    The estimator measures ``E[(log v_{t+Delta} - log v_t)^2]``, with ``Delta``
+    in grid steps, not ``Var(log v_t)``. In rough Bergomi that increment has
+    standard deviation ``nu sqrt(2 H c_H) dt^H`` in the stationary limit, and
+    ``dt = 1 / trading_days`` of a year. Therefore
+
+        nu = nu_per_day * trading_days**H / sqrt(2 H c_H).
+
+    At ``H = 1/2`` the square root is 1 and the two scalings agree. See
+    :func:`c_hurst`.
     """
     days = float(trading_days)
     if not days > 0.0:
         raise ValueError(f"trading_days must be positive, got {trading_days}")
-    return float(nu_per_day) * days ** float(H)
+    h = float(H)
+    return float(nu_per_day) * days**h / math.sqrt(2.0 * h * c_hurst(h))
 
 
 def regime_estimate(
