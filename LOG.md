@@ -27,7 +27,12 @@ at H = 0.147535. That coefficient is the scaling of increments of log v over a l
 per trading day. It is not Var(log v_t). In rough Bergomi a stationary increment of
 log v has standard deviation nu sqrt(2 H c_H) dt^H, with
 c_H = Gamma(H + 1/2) Gamma(2 - 2H) / (2 H Gamma(3/2 - H)). One year is 252 trading
-days, so nu = nu_per_day * 252^H / sqrt(2 H c_H) = 1.328276. The level scaling
+days, so nu = nu_per_day * 252^H / sqrt(2 H c_H) = 1.328276. Holding nu_per_day
+fixed, the central difference of this map in H, step 1e-6, is 8.616046. The Monte
+Carlo SE of H on lags 1 to 50 is 0.01337351, so the uncertainty carried into nu is
+0.115227. The coefficient is 1.328276 plus or minus 0.115227. At H plus or minus
+that SE the map gives 1.448306 and 1.217616. Across the lag windows in the table
+above, at this same nu_per_day, it runs from 1.128162 to 1.424117. The level scaling
 nu_per_day * 252^H is 1.582057, which is the variance of the level and not this
 increment. A simulation at H = 0.15 and nu = 1.5, 16 daily paths of 6 years, lags
 1 to 20, recovers a mean of 1.510. The path standard deviation is 0.033, and the
