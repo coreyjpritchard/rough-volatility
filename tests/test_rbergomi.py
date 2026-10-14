@@ -31,7 +31,7 @@ from roughvol.rbergomi import (
     variance_swap,
 )
 from roughvol.rng import generator, spawn
-from roughvol.volterra import hybrid_scheme_rng
+from roughvol.volterra import hybrid_scheme_rng, power_kernel_weights, wiener_integral
 from tests.zrule import check_replication_means, check_z
 
 SEED = 20261014
@@ -445,7 +445,95 @@ def test_volterra_increment_variance_equals_dt():
 
 def test_volterra_increments_rejects_non_increasing_times():
     model = RoughBergomi()
+    bad = np.array([0.0, 0.3, 0.2, 0.5])
     with pytest.raises(ValueError, match="strictly increasing"):
-        model.volterra_increments(4, np.array([0.0, 0.3, 0.2, 0.5]), seed=1, H=0.1)
+        model.volterra_increments(4, bad, seed=1, H=0.1)
+    with pytest.raises(ValueError, match="strictly increasing"):
+        model.volterra_components(4, bad, seed=1, H=0.1)
     with pytest.raises(ValueError, match="1-d"):
         model.volterra_increments(4, np.array([[0.0, 0.25], [0.5, 1.0]]), seed=1, H=0.1)
+
+
+def _y_from_components(components, H, times, kappa, nu_step):
+    """The rebuild in the rBergomi note. ``nu_step`` multiplies each step."""
+    m, n, width = components.shape
+    if width != kappa + 1:
+        raise AssertionError(f"expected kappa + 1 = {kappa + 1} components, got {width}")
+    nu_step = np.broadcast_to(np.asarray(nu_step, dtype=np.float64), (m, n))
+    weights = power_kernel_weights(H, n, float(times[-1]), kappa=kappa)
+    Y = wiener_integral(weights, nu_step * components[:, :, 0])
+    for lag in range(1, kappa + 1):
+        live = n - lag + 1
+        block = nu_step[:, :live] * components[:, :live, lag]
+        Y[:, lag : lag + live] += block
+    return Y
+
+
+def test_components_rebuild_simulates_y():
+    """A constant nu on the returned components is simulate's Y.
+
+    Parent seed 11, 6 paths, 8 steps on [0, 0.5]. The method receives
+    child 1. H = 0.1 checks kappa = 1 and kappa = 2, where the scheme
+    adds I_k. H = 1/2 checks that every I_k equals dW and the cumsum of
+    dW is Y.
+    """
+    times = np.linspace(0.0, 0.5, 9)
+    parent = 11
+    nu = 1.5
+    xi0 = 0.05
+    for H, kappa in ((0.1, 1), (0.1, 2), (0.5, 1)):
+        model = RoughBergomi(
+            H=H, nu=nu, rho=-0.4, xi0=xi0, kappa=kappa, n_paths=6, n_steps=8
+        )
+        paths = model.simulate(6, times, seed=parent)
+        child = spawn(parent, 4)[1]
+        components = model.volterra_components(6, times, seed=child, H=H)
+        hybrid = hybrid_scheme_rng(H, 8, 0.5, 6, generator(child), kappa=kappa)
+        assert components.shape == (6, 8, kappa + 1)
+        assert np.array_equal(components, hybrid.components)
+        assert np.array_equal(components[:, :, 0], hybrid.dW)
+        plain = _y_from_components(components, H, times, kappa, 1.0)
+        if abs(H - 0.5) < 1e-12:
+            for lag in range(1, kappa + 1):
+                assert np.array_equal(components[:, :, lag], components[:, :, 0])
+            cum = np.cumsum(components[:, :, 0], axis=1)
+            assert np.array_equal(cum, hybrid.Y[:, 1:])
+            # The general sum uses the FFT. At H = 1/2 it agrees with the cumsum to 1e-15.
+            assert np.allclose(plain, hybrid.Y, rtol=0.0, atol=1e-15)
+        else:
+            assert np.array_equal(plain, hybrid.Y)
+        scaled = _y_from_components(components, H, times, kappa, nu)
+        assert np.allclose(scaled, nu * hybrid.Y, rtol=0.0, atol=1e-15)
+        power = np.zeros_like(times)
+        power[1:] = times[1:] ** (2.0 * H)
+        v = xi0 * np.exp(math.sqrt(2.0 * H) * scaled - 0.5 * nu * nu * power)
+        assert np.allclose(v, paths.state["v"], rtol=0.0, atol=1e-15)
+
+
+def test_rebuilt_variance_matches_xi0():
+    """E[v] = xi0 when Y is rebuilt from the components at H = 0.1.
+
+    m = 2,000, n = 64, R = 4, nu = 1.5, kappa = 1, flat xi0 = 0.04.
+    Each contribution is multiplied by that constant nu. The standard
+    error of a node is the path standard deviation over m, divided by
+    sqrt(m). t = 0 is exact and is left out. The paths inside one
+    replication share a seed, so the max bound is per replication and
+    the mean of z is judged on R.
+    """
+    H = 0.1
+    nu = 1.5
+    xi0 = 0.04
+    n_steps = N
+    times = np.linspace(0.0, T_GRID, n_steps + 1)
+    power = np.zeros_like(times)
+    power[1:] = times[1:] ** (2.0 * H)
+    model = RoughBergomi(H=H, nu=nu, rho=-0.7, xi0=xi0, kappa=1)
+    rows = []
+    for r in range(R):
+        components = model.volterra_components(M, times, seed=SEED + 8_000 + r, H=H)
+        assert components.shape == (M, n_steps, 2)
+        scaled = _y_from_components(components, H, times, 1, nu)
+        v = xi0 * np.exp(math.sqrt(2.0 * H) * scaled - 0.5 * nu * nu * power)
+        assert np.allclose(v[:, 0], xi0)
+        rows.append(_mean_z(v[:, 1:], np.full(n_steps, xi0)))
+    _shared(rows)

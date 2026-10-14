@@ -57,11 +57,15 @@ class HybridPaths:
     ``times`` has shape ``(n + 1,)`` and starts at 0. ``Y`` has shape
     ``(m, n + 1)`` and column 0 is 0. ``dW`` has shape ``(m, n)``: column
     j is the Wiener increment on ``[times[j], times[j + 1]]``.
+    ``components`` has shape ``(m, n, kappa + 1)``. The last axis is
+    ``(dW, I_1, ..., I_kappa)`` on that step, the Gaussian vector the
+    scheme adds into ``Y``. At ``H = 1/2`` every ``I_k`` equals ``dW``.
     """
 
     times: np.ndarray
     Y: np.ndarray
     dW: np.ndarray
+    components: np.ndarray
 
 
 def volterra_variance(H: float, t: np.ndarray | float) -> np.ndarray:
@@ -285,7 +289,10 @@ def hybrid_scheme_rng(
         dW = np.sqrt(dt) * shocks[:, 0, :]
         Y = np.zeros((m, n + 1), dtype=np.float64)
         Y[:, 1:] = np.cumsum(dW, axis=0).T
-        return HybridPaths(times=times, Y=Y, dW=dW.T)
+        # The kernel is 1, so each exact integral equals the increment.
+        # No extra normal is drawn.
+        components = np.repeat(dW.T[:, :, None], kappa + 1, axis=2)
+        return HybridPaths(times=times, Y=Y, dW=dW.T, components=components)
 
     sigma = block_covariance(H, kappa, dt)
     chol = np.linalg.cholesky(sigma)
@@ -299,7 +306,9 @@ def hybrid_scheme_rng(
         # I_lag of step j lands at time index j + lag.
         block = correlated[: n - lag + 1, lag, :]
         Y[:, lag : lag + block.shape[0]] += block.T
-    return HybridPaths(times=times, Y=Y, dW=dW.T)
+    # (steps, components, paths) -> (paths, steps, components).
+    components = np.transpose(correlated, (2, 0, 1)).copy()
+    return HybridPaths(times=times, Y=Y, dW=dW.T, components=components)
 
 
 def volterra(

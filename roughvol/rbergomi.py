@@ -20,9 +20,10 @@ driver and is handed to :func:`roughvol.volterra.hybrid_scheme_rng`, which
 draws, at each step, the components ``(dW, I_1, ..., I_kappa)``, path index
 fastest. Child 2 is the spot: at each step, one standard normal per path,
 scaled by ``sqrt(dt)``, and nothing else. Child 3 is unused (kept for a
-surrogate stream). :meth:`RoughBergomi.volterra_increments` is that same
-volatility draw when the caller already holds child 1. It does not spawn,
-and it returns the Wiener increments only.
+surrogate stream). :meth:`RoughBergomi.volterra_components` is that same
+volatility draw when the caller already holds child 1. It does not spawn.
+The return is ``(dW, I_1, ..., I_kappa)`` on each step.
+:meth:`RoughBergomi.volterra_increments` is the ``dW`` column of that array.
 
 The spot step is the left-point exponential. With ``v`` frozen at the left
 end of the step, the multiplier
@@ -341,6 +342,56 @@ class RoughBergomi:
         paths, _mu, _total_var = self._draw(int(n_paths), times, seed=seed, state0=state0)
         return paths
 
+    def volterra_components(
+        self,
+        n_paths: int,
+        times: np.ndarray,
+        *,
+        seed: int | np.random.SeedSequence,
+        H: float,
+    ) -> np.ndarray:
+        """Hybrid-scheme components ``(dW, I_1, ..., I_kappa)`` on each step.
+
+        Shape ``(n_paths, n_steps, kappa + 1)``. ``kappa`` is this model's.
+        ``seed`` is already the volatility child. The draw is
+        :func:`roughvol.volterra.hybrid_scheme_rng` on ``generator(seed)``,
+        with no further spawn. Last-axis index 0 is ``dW``, the Wiener
+        increment on that step, variance equal to the step length. Index
+        ``k >= 1`` is ``I_k``, the exact integral of the power kernel at
+        lag ``k``. At ``H = 1/2`` every ``I_k`` equals ``dW``. The kernel
+        weights are not returned.
+
+        ``times`` is the uniform grid :meth:`simulate` accepts. When ``H``
+        equals this model's ``H``, these are the components that build
+        ``Y`` inside that call.
+
+        A caller rebuilds ``Y`` with a vol of vol on each step. Let ``w``
+        be :func:`roughvol.volterra.power_kernel_weights` for this ``H``,
+        the step count, the horizon and this ``kappa``. Its first
+        ``kappa`` entries are 0. Write ``nu_j`` for the vol of vol on step
+        ``j``, and ``k`` for the lag. The contribution of step ``j`` that
+        lands at time index ``j + k``, for ``j + k <= n_steps``, is
+
+        ``nu_j * components[:, j, k]`` when ``k <= kappa``, and
+        ``nu_j * w[k - 1] * components[:, j, 0]`` when ``k > kappa``.
+
+        Sum the contributions on each time. Column 0 stays 0. A constant
+        ``nu`` factors out of that sum, and dividing by ``nu`` returns the
+        Riemann-Liouville path inside ``simulate``. The compensator in the
+        variance exponential is then ``nu**2 * t**(2H) / 2``. It is the
+        exact variance of the integral, the one :meth:`simulate` uses, not
+        the scheme's sample variance.
+
+        When ``nu_j`` changes with the step, the same exact compensator on
+        the grid is ``sum_j nu_j**2 * (k**(2H) - (k - 1)**(2H)) * dt**(2H) / 2``,
+        with ``k`` the number of steps from ``j`` to the evaluation time
+        and ``dt`` the step length. Replacing ``I_1`` by the lag-1 Riemann
+        weight keeps only ``2H / (H + 1/2)**2`` of ``Var(I_1)``. At
+        ``H = 0.1`` that ratio is ``5/9``, so ``4/9`` of each step's
+        own-term variance is missing and ``E[v]`` falls short of ``xi0``.
+        """
+        return self._hybrid(n_paths, times, seed=seed, H=H).components
+
     def volterra_increments(
         self,
         n_paths: int,
@@ -349,29 +400,25 @@ class RoughBergomi:
         seed: int | np.random.SeedSequence,
         H: float,
     ) -> np.ndarray:
-        """Wiener increments of the hybrid scheme. Shape ``(n_paths, n_steps)``.
+        """Wiener increments, column 0 of :meth:`volterra_components`.
 
-        ``seed`` is already the volatility child. The draw is
-        :func:`roughvol.volterra.hybrid_scheme_rng` on ``generator(seed)``,
-        with no further spawn, at this model's ``kappa``. Column ``k`` is
-        ``W(times[k + 1]) - W(times[k])``, and its variance is the step
-        length. The kernel weights are not returned.
-
-        ``times`` is the uniform grid :meth:`simulate` accepts: length
-        ``n_steps + 1``, starting at 0, strictly increasing, equally spaced.
-        When ``H`` equals this model's ``H``, the array is the ``dW`` inside
-        that ``simulate`` call for the same child.
+        Shape ``(n_paths, n_steps)``. Column ``k`` is
+        ``W(times[k + 1]) - W(times[k])``, with variance equal to the step
+        length. ``dW`` alone does not rebuild ``Y``: the near-field
+        integrals ``I_1, ..., I_kappa`` are on :meth:`volterra_components`.
         """
+        return self.volterra_components(n_paths, times, seed=seed, H=H)[..., 0]
+
+    def _hybrid(self, n_paths: int, times: np.ndarray, *, seed, H: float):
         times = _uniform_times(times)
         n_paths = int(n_paths)
         if n_paths < 1:
             raise ValueError(f"n_paths must be positive, got {n_paths}")
         n = times.size - 1
         horizon = float(times[-1])
-        vol = hybrid_scheme_rng(
+        return hybrid_scheme_rng(
             float(H), n, horizon, n_paths, generator(seed), kappa=self.kappa
         )
-        return vol.dW
 
     def _draw(self, n_paths: int, times: np.ndarray, *, seed, state0):
         times = _uniform_times(times)
