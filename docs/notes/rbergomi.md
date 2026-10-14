@@ -1,6 +1,6 @@
 # Rough Bergomi
 
-The figure `docs/figures/rvb_skew.png` is the absolute at-the-money skew of rough Bergomi against maturity, for H in {0.05, 0.1, 0.2, 0.5}. Vol of vol is nu = 1.5, correlation rho = -0.7, and the forward variance is flat at 0.04. On T in [1/52, 1/4] the log-log slopes are -0.449, -0.416, -0.336 and -0.010. The short-dated claim is a slope of H - 1/2, which is -0.450, -0.400, -0.300 and 0.
+The figure `docs/figures/rvb_skew.png` is the absolute at-the-money skew of rough Bergomi against maturity, for H in {0.05, 0.1, 0.2, 0.5}. Vol of vol is nu = 1.5, correlation rho = -0.7, and the forward variance is flat at 0.04. Each point is the mean of 12 seeds. On T in [1/52, 1/4] the mean log-log slopes are -0.460, -0.410, -0.323 and -0.017. The short-dated claim is a slope of H - 1/2, which is -0.450, -0.400, -0.300 and 0.
 
 ## The model
 
@@ -36,6 +36,6 @@ The one-step check is not Monte Carlo. With v frozen, the multiplier exp(sqrt(v)
 
 ## The skew
 
-psi is the slope of implied volatility against log-moneyness at the money. The fit uses nine strikes on [-h, h], h = max(0.15 sqrt(T), 0.01), and a quadratic. The test, written before the run, asks that the slope of log|psi| on log T, for six geometric maturities in [1/52, 1/4] at H = 0.1, lie within 0.05 of -0.4. It came out at -0.416271, with 8,000 paths and 128 steps. The same points are the H = 0.1 markers on the figure.
+psi is the slope of implied volatility against log-moneyness at the money. The fit uses nine strikes on [-h, h], h = max(0.15 sqrt(T), 0.01), and a quadratic. The test, written before the run, asks that the slope of log|psi| on log T, for six geometric maturities in [1/52, 1/4] at H = 0.1, lie within 0.05 of -0.4. One seed is too noisy for that band: across 12 seeds the standard deviation is 0.0181, and the mean slope is -0.4096, with 8,000 paths and 128 steps. The bar of 0.05 applies to that mean. The same 12 seeds are the H = 0.1 markers on the figure. Replication 0 alone, the original draw, has slope -0.4163.
 
-H = 0.2 on that same window fits -0.336426, which is 0.036 steeper than -0.300. The power is asymptotic. A tighter check would end the window before 1/4. H = 0.5 is nearly flat in T, slope -0.010, which is the diffusive end of the same plot.
+H = 0.2 on that same window has mean slope -0.3232, which is 0.023 steeper than -0.300. The standard error of the mean is 0.005. A single seed fitted -0.3364, a gap of 0.036, which is one draw and not the gap. The power is asymptotic. A tighter check would end the window before 1/4. H = 0.5 has mean slope -0.017, which is the diffusive end of the same plot. The standard deviation there is 0.065, because the skew is small and the log-log slope is noisy.
