@@ -2,9 +2,69 @@
 
 Dated entries, newest first. What was learned, what surprised, open questions.
 
-**Current state:** session 00 built, not yet worked through. The hybrid scheme is in
-`roughvol/volterra.py` (RV-a, not yet merged). **Next:** session 01, when does the
-estimator lie.
+**Current state:** session 00 built, not yet worked through. RV-a (hybrid scheme) and
+RV-b (rough Bergomi) are implemented and not merged. **Next:** session 01, when does
+the estimator lie.
+
+## 2026-10-14: RV-b, rough Bergomi, the forward curve, conditional Monte Carlo
+
+**Found.** The spot step is an exponential martingale. A 32 by 32 Gauss-Hermite
+integral of the one-step multiplier equals 1 to 4.441e-16, over v in {1e-6, 0.04, 1},
+rho in {-1, -0.95, -0.7, -0.2, 0} and dt in {1e-4, 1/64, 0.25, 1}. At t = 0 the
+forward curve equals xi0, gap 0. At H = 1/2, xi_t(u) equals v_t for every tenor
+ahead of the clock, max absolute gap 0 on 32 paths and 16 steps.
+
+Monte Carlo, m = 2,000 paths, R = 4, kappa = 1, H = 0.1, nu = 1.5, xi0(t) = 0.03 + 0.02 t,
+rho = -0.9, 64 steps on [0, 1]. The z-rule max bound is on each replication. The mean
+of z is judged on the four replication centres.
+
+| check | nodes | max \|z\| | cap | replication mean | bound |
+|---|---|---|---|---|---|
+| E[Z_t] = 1 | 64 | 3.118 | 4.320 | -0.546 | 2.114 |
+| E[v_t] = xi0(t) | 64 | 3.352 | 4.320 | 0.175 | 0.767 |
+| E[xi_t(u)] = xi0(u) | 176 | 2.829 | 4.538 | 0.550 | 1.470 |
+
+rho = -0.9 puts 1 / (1 - rho^2) at 5.26, so the second moment of Z is inside the
+range the build plan attributes to Gassiat (2019). That attribution is not re-derived
+here. The variance swap against realised variance, same m and R, n = 32 steps, flat
+xi0 = 0.04, rho = -0.7: max |z| = 2.495 against a cap of 4.157 on 31 nodes,
+replication mean 0.236 against a bound of 1.200. The last step is an identity (both
+sides use v), absolute gap below 1e-12, and it is left out of the z score because
+its standard error is 0.
+
+The skew bar was written before the run: on T in [1/52, 1/4] at H = 0.1, the slope
+of log|psi| on log T is within 0.05 of H - 1/2 = -0.4. nu = 1.5, rho = -0.7,
+xi0 = 0.04, m = 8,000, 128 steps, six geometric maturities, nine strikes on
+[-h, h] with h = max(0.15 sqrt(T), 0.01). One seed is too noisy for that band.
+Across 12 seeds (replication r uses seed 20261014 + 5000 + 100 r + maturity index)
+the mean slope is -0.409580 and the standard deviation is 0.018112. The standard
+error of the mean is 0.005228. The mean sits 0.0096 from -0.4, inside the bar.
+Replication 0 is the original single draw, slope -0.416271.
+
+The figure (`docs/figures/rvb_skew.png`) plots the mean absolute skew over those
+12 seeds. Mean slopes on [1/52, 1/4]:
+
+| H | mean slope | sd | H - 1/2 |
+|---|---|---|---|
+| 0.05 | -0.460398 | 0.015694 | -0.450 |
+| 0.1 | -0.409580 | 0.018112 | -0.400 |
+| 0.2 | -0.323174 | 0.018477 | -0.300 |
+| 0.5 | -0.017350 | 0.065129 | 0 |
+
+At H = 1/2 the hybrid conditional price and a full-truncation Euler (v <- v + nu max(v, 0) dW),
+same normals, m = 2,000, 256 steps, T = 1, strikes 0.9, 1, 1.1, R = 4: max |z| = 3.229
+against a cap of 3.588, replication mean 1.063 against a bound of 2.549. Mean price
+gaps on one replication are about 1e-4.
+
+**Surprised.** On the same window the mean slope at H = 0.2 is -0.323174, which is
+0.023 steeper than -0.300. The standard error of that mean is 0.005. A single seed
+fitted -0.336426, a gap of 0.036, which is one draw from a standard deviation of
+0.018 and not the gap. H = 0.05 and H = 0.1 land closer to H - 1/2. The power is
+an asymptotic claim. The next specification, if that gap is the question, is a window
+that ends before 1/4. The prewritten bar was only for H = 0.1, and it now applies
+to the mean of the 12 seeds.
+
+**Open.** The Hurst routes, including the SPX skew, are RV-c.
 
 ## 2026-10-14: RV-a, hybrid scheme for the Riemann-Liouville kernel
 

@@ -45,7 +45,7 @@ pip install -e ".[dev,data]"            # once
 marimo run sessions/00_what_is_rough.py  # the app, read-only
 marimo edit sessions/00_what_is_rough.py # the app with its code
 python sessions/00_what_is_rough.py      # run every cell as a script
-pytest -m "not slow"                     # tests, about 2 seconds
+pytest -m "not slow"                     # tests, about 3 seconds
 pytest --impl exercises                  # the same tests against your own exercises/ package
 ```
 
@@ -57,6 +57,9 @@ Without Python, open the static export in `docs/`.
 roughvol/fbm.py         exact fractional Brownian motion (Davies-Harte, Cholesky fallback)
 roughvol/volterra.py    Riemann-Liouville process by the hybrid scheme (kappa = 0, 1, 2)
 roughvol/rng.py         SeedSequence children for a model run
+roughvol/rbergomi.py    rough Bergomi: variance, forward curve, conditional Monte Carlo
+roughvol/types.py       Paths, PriceResult and ParamSpec, duck-typed by a host
+roughvol/black.py       Black price and implied volatility for the conditional estimator
 roughvol/estimate.py    GJR Hurst estimator, multi-q version, second-order variogram, Monte Carlo SE
 roughvol/realised.py    S&P 500 daily realised variance: Oxford-Man rv5, Parkinson, Garman-Klass
 roughvol/heston_vol.py  Heston variance paths (full truncation Euler), a control with H = 1/2
@@ -65,6 +68,10 @@ tests/                  pytest; mathematical tests take an `impl` fixture
 data/                   committed caches: spx_rv5_oxford_man.parquet, spx_ohlc_yahoo.parquet
 docs/                   static exports, notes, and figures
 ```
+
+The entry point group `volsurface.models` registers `rbergomi` as
+`roughvol.rbergomi:RoughBergomi`. This package does not import a host. A host
+discovers the model by that entry point and calls it with no arguments.
 
 ## Data
 
@@ -79,6 +86,8 @@ docs/                   static exports, notes, and figures
 ## References
 
 - Gatheral, Jaisson, Rosenbaum (2018). Volatility is rough. Quantitative Finance 18(6).
+- Bayer, Friz, Gatheral (2016). Pricing under rough volatility. Quantitative Finance 16(6).
+- Bennedsen, Lunde, Pakkanen (2017). Hybrid scheme for Brownian semistationary processes. Finance and Stochastics 21(4).
 - Davies, Harte (1987). Tests for Hurst effect. Biometrika 74(1).
 - Fukasawa, Takabatake, Westphal (2019). Is volatility rough? arXiv preprint.
 
