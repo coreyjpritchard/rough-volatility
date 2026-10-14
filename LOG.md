@@ -2,8 +2,42 @@
 
 Dated entries, newest first. What was learned, what surprised, open questions.
 
-**Current state:** session 00 built, not yet worked through. **Next:** session 01, when
-does the estimator lie.
+**Current state:** session 00 built, not yet worked through. The hybrid scheme is in
+`roughvol/volterra.py` (RV-a, not yet merged). **Next:** session 01, when does the
+estimator lie.
+
+## 2026-10-14: RV-a, hybrid scheme for the Riemann-Liouville kernel
+
+**Found.** Y_t = int_0^t (t - s)^{H - 1/2} dW_s has Var(Y_t) = t^{2H} / (2H). The
+hybrid scheme of Bennedsen, Lunde and Pakkanen (2017), kappa in {0, 1, 2}, default 1,
+matches that variance by the z-rule. Grid: n = 64 steps on [0, 1], m = 2,000 paths,
+R = 4 replications, H in {0.05, 0.1, 0.3, 0.5}. The same grid matches an exact
+Cholesky draw on the means and the second moments, for H in {0.05, 0.1, 0.3}. At
+H = 1/2 the scheme is Brownian motion pathwise: the increments of Y are the Wiener
+increments, to 1e-12. The kappa-block covariance matches the integral closed form to
+1e-12, including the hypergeometric cross entry at kappa = 2 against a quadrature.
+
+The covariance figure (`docs/figures/rva_covariance.png`, H = 0.1, T = 1, n from 16
+to 512) is deterministic. Root-mean-square covariance error at n = 64:
+
+| kappa | RMS | rel. error of Var(Y_1) | slope of log RMS | slope of log abs rel. var |
+|---|---|---|---|---|
+| 0 | 1.214e-1 | -0.1940 | -0.700 | -0.200 |
+| 1 | 5.234e-3 | -5.895e-4 | -0.681 | -0.198 |
+| 2 | 2.854e-3 | -1.800e-4 | -0.660 | -0.194 |
+
+kappa = 1 is a factor of 23 below kappa = 0 in RMS at n = 64, and kappa = 2 is a
+factor of 1.83 below kappa = 1. The RMS slopes sit together. The terminal variance
+error has slope -2H = -0.2, which is the rate in their Theorem 2.5. The covariance
+RMS is a different functional, so its slope is not that rate. Raising kappa changes
+the level.
+
+**Surprised.** The archive repository was not readable from this build, so
+`power_kernel_weights` and `wiener_integral` follow the paper's equations (2.15),
+(3.5) and (3.7) under those names, rather than a line copy of `roughvol/paths.py`.
+
+**Open.** The scheme's covariance is not the covariance of rough Bergomi's spot.
+That is RV-b.
 
 ## 2026-10-08: session 00, what is H for the S&P 500
 

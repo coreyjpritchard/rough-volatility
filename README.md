@@ -4,6 +4,12 @@ How rough is the volatility of the S&P 500, and what does roughness do to option
 Each session is one question, answered by an interactive marimo app that opens on a figure
 and a slider.
 
+This repository is the canonical home of the Python package `roughvol`. The package of
+the same name in
+[rough-volatility-archive-2026](https://github.com/coreyjpritchard/rough-volatility-archive-2026)
+is superseded by this one. The two distributions cannot be installed side by side: they
+share the import name `roughvol`.
+
 ![log m(q, Δ) against log Δ for S&P 500 realised volatility, and the slopes ζ_q against q](docs/hurst_spx.png)
 
 **Headline so far: Ĥ = 0.149 for the S&P 500.** Gatheral, Jaisson and Rosenbaum (2018)
@@ -49,13 +55,15 @@ Without Python, open the static export in `docs/`.
 
 ```
 roughvol/fbm.py         exact fractional Brownian motion (Davies-Harte, Cholesky fallback)
+roughvol/volterra.py    Riemann-Liouville process by the hybrid scheme (kappa = 0, 1, 2)
+roughvol/rng.py         SeedSequence children for a model run
 roughvol/estimate.py    GJR Hurst estimator, multi-q version, second-order variogram, Monte Carlo SE
 roughvol/realised.py    S&P 500 daily realised variance: Oxford-Man rv5, Parkinson, Garman-Klass
 roughvol/heston_vol.py  Heston variance paths (full truncation Euler), a control with H = 1/2
 sessions/               marimo apps, one per session
 tests/                  pytest; mathematical tests take an `impl` fixture
 data/                   committed caches: spx_rv5_oxford_man.parquet, spx_ohlc_yahoo.parquet
-docs/                   static exports and the README figure (docs/make_readme_figure.py)
+docs/                   static exports, notes, and figures
 ```
 
 ## Data
