@@ -91,29 +91,34 @@ its standard error is 0.
 The skew bar was written before the run: on T in [1/52, 1/4] at H = 0.1, the slope
 of log|psi| on log T is within 0.05 of H - 1/2 = -0.4. nu = 1.5, rho = -0.7,
 xi0 = 0.04, m = 8,000, 128 steps, six geometric maturities, nine strikes on
-[-h, h] with h = max(0.15 sqrt(T), 0.01). The fitted slope is -0.416271. The
-absolute ATM skews are 1.03084, 0.97124, 0.68871, 0.54469, 0.47401, 0.37266 at
-T = 0.019231, 0.032121, 0.053651, 0.089611, 0.149676, 0.250000.
+[-h, h] with h = max(0.15 sqrt(T), 0.01). One seed is too noisy for that band.
+Across 12 seeds (replication r uses seed 20261014 + 5000 + 100 r + maturity index)
+the mean slope is -0.409580 and the standard deviation is 0.018112. The standard
+error of the mean is 0.005228. The mean sits 0.0096 from -0.4, inside the bar.
+Replication 0 is the original single draw, slope -0.416271.
 
-The figure (`docs/figures/rvb_skew.png`) uses the same estimator. Slopes on
-[1/52, 1/4]:
+The figure (`docs/figures/rvb_skew.png`) plots the mean absolute skew over those
+12 seeds. Mean slopes on [1/52, 1/4]:
 
-| H | slope | H - 1/2 |
-|---|---|---|
-| 0.05 | -0.449004 | -0.450 |
-| 0.1 | -0.416271 | -0.400 |
-| 0.2 | -0.336426 | -0.300 |
-| 0.5 | -0.010032 | 0 |
+| H | mean slope | sd | H - 1/2 |
+|---|---|---|---|
+| 0.05 | -0.460398 | 0.015694 | -0.450 |
+| 0.1 | -0.409580 | 0.018112 | -0.400 |
+| 0.2 | -0.323174 | 0.018477 | -0.300 |
+| 0.5 | -0.017350 | 0.065129 | 0 |
 
 At H = 1/2 the hybrid conditional price and a full-truncation Euler (v <- v + nu max(v, 0) dW),
 same normals, m = 2,000, 256 steps, T = 1, strikes 0.9, 1, 1.1, R = 4: max |z| = 3.229
 against a cap of 3.588, replication mean 1.063 against a bound of 2.549. Mean price
 gaps on one replication are about 1e-4.
 
-**Surprised.** On the same window, H = 0.2 fits -0.336 against a target of -0.300, a
-gap of 0.036, steeper than H - 1/2. H = 0.05 and H = 0.1 land closer. The power is
+**Surprised.** On the same window the mean slope at H = 0.2 is -0.323174, which is
+0.023 steeper than -0.300. The standard error of that mean is 0.005. A single seed
+fitted -0.336426, a gap of 0.036, which is one draw from a standard deviation of
+0.018 and not the gap. H = 0.05 and H = 0.1 land closer to H - 1/2. The power is
 an asymptotic claim. The next specification, if that gap is the question, is a window
-that ends before 1/4. The prewritten bar was only for H = 0.1, and it was not moved.
+that ends before 1/4. The prewritten bar was only for H = 0.1, and it now applies
+to the mean of the 12 seeds.
 
 **Open.** The Hurst routes, including the SPX skew, are RV-c.
 

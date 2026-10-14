@@ -7,8 +7,10 @@ Each point is a conditional Monte Carlo price, 8,000 paths, 128 steps,
 nine log-moneynesses on [-h, h] with h = max(0.15 sqrt(T), 0.01), and the
 slope of a quadratic in log-moneyness at the money.
 
-The H = 0.1 points on [1/52, 1/4] use the same seeds as
-``tests/test_rbergomi.py::test_skew_exponent`` (seed 20261014 + 5000 + index).
+Twelve seeds. The plotted skew is the mean of the absolute skew. The legend
+is the mean of the per-seed log-log slopes on [1/52, 1/4]. At H = 0.1 that
+mean is what ``tests/test_rbergomi.py::test_skew_exponent`` checks.
+Replication 0 on that window uses seed 20261014 + 5000 + 100 * rep + index.
 """
 
 from __future__ import annotations
@@ -32,15 +34,16 @@ RHO = -0.7
 XI0 = 0.04
 N_PATHS = 8_000
 N_STEPS = 128
+REPS = 12
 SHORT = np.geomspace(1.0 / 52.0, 0.25, 6)
 MATURITIES = np.concatenate([SHORT, np.array([0.5, 1.0])])
 OUT_DIR = Path(__file__).resolve().parents[1] / "docs" / "figures"
 
 
-def _seed(H: float, index: int) -> int:
+def _seed(H: float, rep: int, index: int) -> int:
     if abs(H - 0.1) < 1e-12 and index < SHORT.size:
-        return SEED + 5_000 + index
-    return SEED + 20_000 + int(round(1000 * H)) + index
+        return SEED + 5_000 + 100 * rep + index
+    return SEED + 20_000 + int(round(1000 * H)) + 100 * rep + index
 
 
 def main() -> None:
@@ -49,23 +52,59 @@ def main() -> None:
         model = RoughBergomi(
             H=H, nu=NU, rho=RHO, xi0=XI0, n_steps=N_STEPS, n_paths=N_PATHS, kappa=1
         )
+        slopes = []
+        by_maturity: list[list[float]] = [[] for _ in MATURITIES]
+        for rep in range(REPS):
+            skew = np.array(
+                [
+                    model.atm_skew(float(maturity), n_paths=N_PATHS, seed=_seed(H, rep, index))
+                    for index, maturity in enumerate(MATURITIES)
+                ]
+            )
+            for index, value in enumerate(skew):
+                by_maturity[index].append(float(value))
+            short = skew[: SHORT.size]
+            slopes.append(float(np.polyfit(np.log(SHORT), np.log(np.abs(short)), 1)[0]))
+        slopes_arr = np.asarray(slopes, dtype=np.float64)
+        mean_slope = float(slopes_arr.mean())
+        sd_slope = float(slopes_arr.std(ddof=1))
+        print(
+            f"H={H} mean slope on [1/52, 1/4] = {mean_slope:.6f} "
+            f"sd={sd_slope:.6f} target {H - 0.5:.6f}"
+        )
         for index, maturity in enumerate(MATURITIES):
-            skew = model.atm_skew(float(maturity), n_paths=N_PATHS, seed=_seed(H, index))
+            sample = np.asarray(by_maturity[index], dtype=np.float64)
+            mean_skew = float(sample.mean())
             rows.append(
                 {
                     "H": H,
                     "T": float(maturity),
-                    "skew": skew,
-                    "abs_skew": abs(skew),
+                    "skew": mean_skew,
+                    "abs_skew": float(np.mean(np.abs(sample))),
+                    "skew_sd": float(sample.std(ddof=1)),
                     "n_paths": N_PATHS,
                     "n_steps": N_STEPS,
+                    "n_seeds": REPS,
+                    "mean_slope": mean_slope,
+                    "slope_sd": sd_slope,
                 }
             )
-            print(f"H={H} T={maturity:.6f} skew={skew:.6f}")
+            print(f"H={H} T={maturity:.6f} mean skew={mean_skew:.6f}")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     csv_path = OUT_DIR / "rvb_skew.csv"
-    fields = ["H", "T", "skew", "abs_skew", "n_paths", "n_steps"]
+    fields = [
+        "H",
+        "T",
+        "skew",
+        "abs_skew",
+        "skew_sd",
+        "n_paths",
+        "n_steps",
+        "n_seeds",
+        "mean_slope",
+        "slope_sd",
+    ]
     with csv_path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
@@ -74,17 +113,13 @@ def main() -> None:
     fig, ax = plt.subplots(figsize=(6.2, 4.2))
     for H in H_VALUES:
         subset = [row for row in rows if row["H"] == H]
-        short = [row for row in subset if row["T"] <= 0.25 + 1e-12]
-        log_t = np.log([row["T"] for row in short])
-        log_s = np.log([row["abs_skew"] for row in short])
-        slope = float(np.polyfit(log_t, log_s, 1)[0])
+        slope = float(subset[0]["mean_slope"])
         ax.loglog(
             [row["T"] for row in subset],
             [row["abs_skew"] for row in subset],
             marker="o",
-            label=f"H = {H}, slope {slope:.3f}",
+            label=f"H = {H}, mean slope {slope:.3f}",
         )
-        print(f"H={H} slope on [1/52, 1/4] = {slope:.6f}, target {H - 0.5:.6f}")
     ax.set_xlabel("maturity T")
     ax.set_ylabel("absolute ATM skew")
     ax.set_title("Rough Bergomi skew, nu = 1.5, rho = -0.7")
