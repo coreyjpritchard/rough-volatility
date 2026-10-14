@@ -2,9 +2,65 @@
 
 Dated entries, newest first. What was learned, what surprised, open questions.
 
-**Current state:** session 00 built, not yet worked through. RV-a (hybrid scheme) and
-RV-b (rough Bergomi) are implemented and not merged. **Next:** session 01, when does
-the estimator lie.
+**Current state:** session 00 built, not yet worked through. RV-a, RV-b and RV-c are
+implemented and not merged. **Next:** session 01, when does the estimator lie.
+
+## 2026-10-14: RV-c, Hurst by the realised-variance route and by the skew
+
+**Found.** The headline error on a GJR estimate is the Monte Carlo standard error,
+the spread of the estimator on 40 fractional Brownian paths of the same length.
+On the Oxford-Man rv5 series (5,552 days, seed 20261014) that spread is 0.0134 at
+lags 1 to 50, where the point estimate is 0.1475. Session 00 rounded the same
+point estimate to 0.148 and quoted 0.009 from a different draw of 40 paths.
+
+Lag window, q = 2. The error is that Monte Carlo SE.
+
+| Source | 1 to 10 | 1 to 20 | 1 to 50 | 1 to 100 | 1 to 200 |
+|---|---|---|---|---|---|
+| rv5, n = 5,552 | 0.1583 (0.0066) | 0.1508 (0.0082) | 0.1475 (0.0134) | 0.1426 (0.0162) | 0.1225 (0.0139) |
+| Parkinson, n = 6,731 | 0.0793 (0.0046) | 0.0844 (0.0042) | 0.0900 (0.0066) | 0.0920 (0.0085) | 0.0830 (0.0113) |
+| Garman-Klass, n = 6,731 | 0.0882 (0.0050) | 0.0866 (0.0060) | 0.0916 (0.0060) | 0.0925 (0.0068) | 0.0824 (0.0085) |
+
+On rv5 at lags 1 to 50 the structure-function intercept maps to nu = 0.6997 with
+Monte Carlo SE 0.0133, under log sigma = (nu / 2) times unit-step fBm. That is
+not a price calibration of rough Bergomi.
+
+The SPX skew was refit from the 14 October 2026 chain (40 expiries, parity
+forwards, quadratic ATM skew on |k| <= max(0.15 sqrt(T), 0.01)). All 40 expiries
+give |psi| = 0.305112 T^{-0.332825}, so H = 1/2 - 0.332825 = 0.167175. The first
+two expiries have discount factors above 1 and are kept. Their skews are -2.9648
+at T = 0.001139 and -1.9889 at T = 0.003879. The last expiry, T = 0.9628, has
+skew -0.2815.
+
+The same fit on windows chosen before the run:
+
+| Window | Expiries | H |
+|---|---|---|
+| all | 40 | 0.167175 |
+| 1/252 to 1/12 | 20 | 0.206983 |
+| 1/52 to 1/4 | 28 | 0.207468 |
+| 1/12 to 1 | 18 | 0.115277 |
+| 1/52 to 1 | 35 | 0.161886 |
+
+The figure is `docs/figures/rvc_routes.png`. It has no reference line at a true H.
+
+On fBm, 4,096 steps, 40 paths, lags 1 to 50, the mean estimate for H in
+{0.05, 0.15, 0.5} lies inside the path-to-path standard deviation. An exact
+power law |psi| = A T^{-(1/2 - H)} is recovered to 1e-10. Two synthetic regimes
+at H = 0.15, nu = 0.6 and 1.8, twenty paths of 4,096 steps, each recover nu
+inside that Monte Carlo SE. The join between the blocks is not used.
+
+**Surprised.** The all-expiry skew H is 0.167175, and the window 1/52 to 1/4,
+the one used for the rough Bergomi exponent, gives 0.207468. That is 0.040
+higher. The window 1/12 to 1 gives 0.115277, which is 0.052 lower. Dropping
+only the sub-week expiries (1/52 to 1, which also drops the two discount
+factors above 1) moves H by 0.005, to 0.161886. The front two points are not
+the gap. The next specification is a fit on a stated expiry set with the
+discount factor capped at 1, reported next to this table rather than in place
+of it.
+
+**Open.** Which expiry set a calibration should use, now that the three
+windows disagree by several hundredths.
 
 ## 2026-10-14: RV-b, rough Bergomi, the forward curve, conditional Monte Carlo
 

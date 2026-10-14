@@ -60,7 +60,7 @@ roughvol/rng.py         SeedSequence children for a model run
 roughvol/rbergomi.py    rough Bergomi: variance, forward curve, conditional Monte Carlo
 roughvol/types.py       Paths, PriceResult and ParamSpec, duck-typed by a host
 roughvol/black.py       Black price and implied volatility for the conditional estimator
-roughvol/estimate.py    GJR Hurst estimator, multi-q version, second-order variogram, Monte Carlo SE
+roughvol/estimate.py    GJR Hurst estimator, skew route, per-regime vol of vol, Monte Carlo SE
 roughvol/realised.py    S&P 500 daily realised variance: Oxford-Man rv5, Parkinson, Garman-Klass
 roughvol/heston_vol.py  Heston variance paths (full truncation Euler), a control with H = 1/2
 sessions/               marimo apps, one per session
