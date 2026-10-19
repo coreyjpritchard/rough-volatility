@@ -12,10 +12,10 @@ share the import name `roughvol`.
 
 ![log m(q, Δ) against log Δ for S&P 500 realised volatility, and the slopes ζ_q against q](docs/hurst_spx.png)
 
-**Headline so far: Ĥ = 0.149 for the S&P 500.** Gatheral, Jaisson and Rosenbaum (2018)
-estimator, five moments q from 0.5 to 3, lags 1 to 50 trading days, on 5-minute realised
+**Headline so far: Ĥ = 0.148 for the S&P 500.** Gatheral, Jaisson and Rosenbaum (2018)
+estimator, q = 2, lags 1 to 50 trading days, on 5-minute realised
 variance (`rv5`) from the Oxford-Man Institute realised library, 3 January 2000 to
-25 February 2022 (5,552 days). The Monte Carlo standard error is about 0.009. Brownian
+25 February 2022 (5,552 days). The Monte Carlo standard error is about 0.013 (`docs/figures/rvc_routes.csv`). Brownian
 volatility would give 0.5. The same estimator on a daily high-low range estimator from
 Yahoo Finance (2000 to October 2026) gives 0.092, because the range estimator's
 measurement noise pulls Ĥ down (see the LOG).
