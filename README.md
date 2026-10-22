@@ -106,3 +106,5 @@ uv run marimo run sessions/00_what_is_rough.py
 - Fukasawa, Takabatake, Westphal (2019). Is volatility rough? arXiv preprint.
 
 To cite this repository, see [CITATION.cff](CITATION.cff). MIT licence.
+
+Built with the help of AI coding tools; all results are reproducible from the scripts in this repo.
