@@ -1,7 +1,7 @@
 """Shared fixtures. `impl` points the mathematical tests at an implementation package.
 
     pytest                      # tests roughvol
-    pytest --impl exercises     # tests Corey's own exercises/fbm.py, exercises/estimate.py, ...
+    pytest --impl exercises     # tests exercises/fbm.py, exercises/estimate.py, ...
 
 `impl.fbm`, `impl.estimate` and `impl.heston_vol` resolve to modules of the chosen
 package. A test whose module is missing is skipped, so exercises can be written one file
