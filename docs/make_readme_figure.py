@@ -69,11 +69,16 @@ ax1.legend(
 
 qq = np.linspace(0, 3.2, 10)
 ax2.plot(qq, 0.5 * qq, "--", lw=1.2, color=MUTED, label="Brownian volatility, H = 0.5")
-for fit, c, name in [
-    (fit_om, BLUE, "Oxford-Man rv5"),
-    (fit_pk, ORANGE, "Parkinson range (biased low)"),
+for fit, c, label in [
+    (
+        fit_om,
+        BLUE,
+        f"Oxford-Man rv5, fit over all q: H = {fit_om.H:.3f}\n"
+        f"(headline {head.H:.3f} uses q = 2 only)",
+    ),
+    (fit_pk, ORANGE, f"Parkinson range, fit over all q: H = {fit_pk.H:.3f}\n(biased low)"),
 ]:
-    ax2.plot(qq, fit.H * qq, "-", lw=2, color=c, label=f"{name}: all-q H = {fit.H:.3f}")
+    ax2.plot(qq, fit.H * qq, "-", lw=2, color=c, label=label)
     ax2.plot(fit.qs, fit.zetas, "o", ms=6, color=c, mec="white", mew=1.5)
 ax2.set_xlim(0, 3.2)
 ax2.set_ylim(0, 1.65)
