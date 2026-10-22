@@ -132,8 +132,12 @@ def main() -> None:
         loc="left",
         fontsize=10,
     )
-    ax.legend(frameon=False, fontsize=8.5, title="points: simulated; dashed: slope H - 1/2",
-              title_fontsize=8.5)
+    ax.legend(
+        frameon=False,
+        fontsize=8.5,
+        title="points: simulated; dashed: slope H - 1/2",
+        title_fontsize=8.5,
+    )
     ax.grid(True, which="major", alpha=0.3)
     fig.text(
         0.01,
