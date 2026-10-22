@@ -1,7 +1,7 @@
 # Roadmap
 
 The session ladder. Levels are defined in `CLAUDE.md`: 0 play, 1 reproduce,
-2 implement, 3 extend. A box is ticked when Corey has worked through the session.
+2 implement, 3 extend. A box is ticked once the session has been worked through.
 
 - [ ] **00 What does H do to a path, and what is H for the S&P 500?** (level 0).
   `sessions/00_what_is_rough.py`. A slider on H morphs an fBm path; the Gatheral,
