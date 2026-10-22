@@ -7,7 +7,25 @@ Gatheral, Jaisson and Rosenbaum (2018) estimator, q = 2, lags 1 to 50 trading da
 fractional Brownian paths of the same length. The SPX implied volatility skew gives an
 independent H = 0.167 (0.115 to 0.207 across maturity windows) from one chain, 14 October 2026.
 
-![S&P 500 volatility is rough: log m(q, Δ) against log Δ, and the slopes ζ_q against q](docs/hurst_spx.png)
+![Two panels. Left: log m(q, Δ) against log lag Δ for q = 0.5 to 3 on S&P 500 rv5, each a straight least-squares line. Right: the fitted slopes ζ_q against q, on a line of slope H = 0.149 for rv5 and 0.092 for the Parkinson range, far below the dashed H = 0.5 line](docs/hurst_spx.png)
+
+**How to read this.** The left panel takes x = log σ from daily rv5 and plots log m(q, Δ),
+the log of the mean of |x(t + Δ) - x(t)|^q, against log Δ for lags of 1 to 50 trading days,
+one line per moment order q. If log-volatility increments scale like Δ^H, then
+m(q, Δ) ∝ Δ^(qH), so every line is straight with slope ζ_q = qH; the right panel shows the
+slopes are linear in q, which is monofractal scaling with a single H of about 0.15, far below
+the 0.5 of Brownian volatility (Gatheral, Jaisson and Rosenbaum 2018). Roughness matters for
+options because in a rough model the at-the-money skew behaves like T^(H - 1/2), so it
+steepens sharply at short maturities, as the SPX skew does (|ψ| ∝ T^-0.333 below); the
+simulated rough Bergomi skews in the table follow H - 1/2 (Bayer, Friz and Gatheral 2016). The
+orange Parkinson line is lower because a daily range estimate adds roughly independent noise
+to log σ, which adds the same amount to m(2, Δ) at every lag and flattens the line.
+The ± 0.010 is the spread of the same estimator over 1,000 simulated fractional Brownian
+paths of the same length; the regression standard error treats the overlapping lags as
+independent and is 6 to 20 times too small on simulated paths ([LOG.md](LOG.md)).
+
+**Caveat.** Ĥ drifts with the lag window (0.158 at lags 1 to 10, 0.122 at 1 to 200), and the
+upward bias from averaging spot variance over each day is not yet separated from the estimate.
 
 ## Results
 
