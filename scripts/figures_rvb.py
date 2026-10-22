@@ -110,22 +110,42 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(rows)
 
-    fig, ax = plt.subplots(figsize=(6.2, 4.2))
+    fig, ax = plt.subplots(figsize=(6.8, 4.8))
     for H in H_VALUES:
         subset = [row for row in rows if row["H"] == H]
+        T_all = np.array([row["T"] for row in subset])
+        skew = np.array([row["abs_skew"] for row in subset])
         slope = float(subset[0]["mean_slope"])
-        ax.loglog(
-            [row["T"] for row in subset],
-            [row["abs_skew"] for row in subset],
-            marker="o",
-            label=f"H = {H}, mean slope {slope:.3f}",
-        )
+        line = ax.loglog(T_all, skew, "o", ms=5, label=f"H = {H}: fitted slope {slope:.2f}")[0]
+        anchor = T_all[0]
+        guide = SHORT
+        guide_skew = skew[0] * (guide / anchor) ** (H - 0.5)
+        ax.loglog(guide, guide_skew, "--", lw=1, color=line.get_color())
+    ticks = [1 / 52, 1 / 12, 0.25, 0.5, 1.0]
+    ax.set_xticks(ticks, ["1 week", "1 month", "3 months", "6 months", "1 year"])
+    ax.minorticks_off()
+    ax.set_yticks([0.02, 0.05, 0.1, 0.2, 0.5, 1.0], ["0.02", "0.05", "0.1", "0.2", "0.5", "1"])
     ax.set_xlabel("maturity T")
-    ax.set_ylabel("absolute ATM skew")
-    ax.set_title("Rough Bergomi skew, nu = 1.5, rho = -0.7")
-    ax.legend()
-    ax.grid(True, which="both", alpha=0.3)
-    fig.tight_layout()
+    ax.set_ylabel("|ATM skew|, d sigma_imp / d log K")
+    ax.set_title(
+        "Rough Bergomi: the short-dated skew steepens as H falls, slope close to H - 1/2",
+        loc="left",
+        fontsize=10,
+    )
+    ax.legend(frameon=False, fontsize=8.5, title="points: simulated; dashed: slope H - 1/2",
+              title_fontsize=8.5)
+    ax.grid(True, which="major", alpha=0.3)
+    fig.text(
+        0.01,
+        0.01,
+        f"Simulated, not market data: nu = {NU}, rho = {RHO}, xi0 = {XI0}, {N_STEPS} steps, "
+        f"kappa = 1, {N_PATHS:,} paths x {REPS} seeds.\n"
+        "Points are the mean |skew| over seeds; slopes are fitted on 1 week to 3 months.",
+        fontsize=7.5,
+        color="#52514e",
+        va="bottom",
+    )
+    fig.tight_layout(rect=(0, 0.07, 1, 1))
     png_path = OUT_DIR / "rvb_skew.png"
     fig.savefig(png_path, dpi=140)
     print(f"wrote {png_path}")

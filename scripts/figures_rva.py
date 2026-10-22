@@ -57,21 +57,37 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(rows)
 
-    fig, ax = plt.subplots(figsize=(6.2, 4.2))
+    by_kappa = {k: np.array([row["rms"] for row in rows if row["kappa"] == k]) for k in KAPPAS}
+    ratio = by_kappa[0] / by_kappa[1]
+    print(f"kappa 0 / kappa 1 error ratio: {ratio.min():.1f} to {ratio.max():.1f}")
+    fig, ax = plt.subplots(figsize=(6.6, 4.6))
     for kappa in KAPPAS:
-        subset = [row for row in rows if row["kappa"] == kappa]
-        ax.loglog(
-            [row["n"] for row in subset],
-            [row["rms"] for row in subset],
-            marker="o",
-            label=f"kappa = {kappa}",
-        )
-    ax.set_xlabel("number of steps n")
-    ax.set_ylabel("covariance RMS error")
-    ax.set_title(f"Hybrid scheme, H = {H}")
-    ax.legend()
-    ax.grid(True, which="both", alpha=0.3)
-    fig.tight_layout()
+        name = "Riemann sum" if kappa == 0 else f"{kappa} lag{'s' if kappa > 1 else ''} exact"
+        ax.loglog(NS, by_kappa[kappa], marker="o", label=f"kappa = {kappa} ({name})")
+    ax.set_xticks(NS, [str(n) for n in NS])
+    ax.minorticks_off()
+    ax.set_xlabel("number of time steps n on [0, 1]")
+    ax.set_ylabel("RMS error of the covariance matrix")
+    ax.set_title(
+        f"Keeping the first lag exact cuts the covariance error {ratio.min():.0f} to "
+        f"{ratio.max():.0f} times\n"
+        f"Hybrid scheme for a Riemann-Liouville process, H = {H}, T = {T:g}",
+        loc="left",
+        fontsize=10,
+    )
+    ax.legend(frameon=False)
+    ax.grid(True, which="major", alpha=0.3)
+    fig.text(
+        0.01,
+        0.01,
+        "Deterministic: scheme covariance against the exact covariance on t_i = i/n. The log-log "
+        "slope is about -0.7\nfor every kappa, so kappa lowers the constant and not the rate. "
+        "Scheme of Bennedsen, Lunde and Pakkanen (2017).",
+        fontsize=7.5,
+        color="#52514e",
+        va="bottom",
+    )
+    fig.tight_layout(rect=(0, 0.07, 1, 1))
     png_path = OUT_DIR / "rva_covariance.png"
     fig.savefig(png_path, dpi=140)
     print(f"wrote {png_path}")
