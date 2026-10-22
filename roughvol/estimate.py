@@ -167,6 +167,11 @@ class RegimeVolEstimate:
     coefficient. ``se_mc_H`` and ``se_mc_nu_per_day`` are the spreads of those
     two estimators on fractional Brownian paths of the same length, at the
     estimated ``(H, nu_per_day)``.
+
+    ``se_mc_nu`` is the spread of the annual rough Bergomi ``nu`` on the same
+    paths: each path gives its own ``(H, nu_per_day)``, and the pair goes
+    through :func:`rbergomi_nu` together. That carries the error of both
+    estimates and their correlation, ``corr_mc_H_nu_per_day``, into ``nu``.
     """
 
     H: float
@@ -175,6 +180,8 @@ class RegimeVolEstimate:
     se_mc_nu_per_day: float
     lags: np.ndarray
     n_obs: int
+    se_mc_nu: float = float("nan")
+    corr_mc_H_nu_per_day: float = float("nan")
 
     def to_rbergomi_nu(self, trading_days: float = 252.0) -> float:
         """Annual rough Bergomi vol of vol. See :func:`rbergomi_nu`."""
@@ -336,10 +343,13 @@ def regime_estimate(
     paths = fbm(H_draw, n, float(n), reps, seed=seed)
     heights = []
     vols = []
+    annual = []
     for path in paths:
         trial = hurst_gjr((nu / 2.0) * path, 2.0, fit.lags)
+        trial_nu = vol_of_vol_from_intercept(trial.intercept)
         heights.append(trial.H)
-        vols.append(vol_of_vol_from_intercept(trial.intercept))
+        vols.append(trial_nu)
+        annual.append(rbergomi_nu(trial_nu, float(np.clip(trial.H, 0.01, 0.99))))
     return RegimeVolEstimate(
         H=fit.H,
         nu_per_day=nu,
@@ -347,6 +357,8 @@ def regime_estimate(
         se_mc_nu_per_day=float(np.std(vols, ddof=1)),
         lags=fit.lags,
         n_obs=int(len(x)),
+        se_mc_nu=float(np.std(annual, ddof=1)),
+        corr_mc_H_nu_per_day=float(np.corrcoef(heights, vols)[0, 1]),
     )
 
 

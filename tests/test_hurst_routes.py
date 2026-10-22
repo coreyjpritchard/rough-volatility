@@ -161,12 +161,12 @@ def test_nu_per_day_converts_to_annual_rbergomi_nu(impl):
 
 
 def test_monte_carlo_se_of_h_propagates_into_rbergomi_nu(impl):
-    """The H error is carried by a central difference, with nu_per_day fixed.
+    """The H error alone, carried by a central difference with nu_per_day fixed.
 
     nu(H) = nu_per_day * 252^H / sqrt(2 H c_H). The derivative is
-    (nu(H + ε) - nu(H - ε)) / (2ε) at ε = 1e-6. The standard error is the
-    lags 1 to 50 cell of docs/figures/rvc_routes.csv. The product is the
-    uncertainty reported with 1.328276.
+    (nu(H + ε) - nu(H - ε)) / (2ε) at ε = 1e-6. se_H = 0.013374 is the
+    40-path standard error of the first version of the figure. This is the
+    one-at-a-time bound; the joint error is checked in the next test.
     """
     nu_per_day = 0.6997318719333629
     H = 0.14753495414537035
@@ -185,6 +185,37 @@ def test_monte_carlo_se_of_h_propagates_into_rbergomi_nu(impl):
     assert nu(H - se_H) == pytest.approx(1.21761606, abs=1e-8)
     assert nu(0.12249034699599022) == pytest.approx(1.128162, abs=5e-7)
     assert nu(0.1582991406377058) == pytest.approx(1.424117, abs=5e-7)
+
+
+def test_joint_error_of_rbergomi_nu_uses_each_paths_pair(impl):
+    """se_mc_nu is the spread of rbergomi_nu(nu_per_day_i, H_i) over the paths.
+
+    The same fBm paths, at the same seed, are rebuilt here and the pair from
+    each path is mapped together. The correlation of H and nu_per_day across
+    paths is negative, so the joint error is below the sum of the two
+    one-at-a-time errors.
+    """
+    from roughvol.fbm import fbm
+
+    H, nu_per_day, n, seed, reps = 0.15, 0.7, 2048, SEED + 11, 40
+    x = (nu_per_day / 2.0) * fbm(H, n, float(n), 1, seed=SEED + 10)[0]
+    est = impl.estimate.regime_estimate(x, LAGS, seed=seed, reps=reps)
+    fit = impl.estimate.hurst_gjr(x, 2.0, LAGS)
+    nu_hat = impl.estimate.vol_of_vol_from_intercept(fit.intercept)
+    annual = []
+    for path in fbm(float(np.clip(fit.H, 0.01, 0.99)), n, float(n), reps, seed=seed):
+        trial = impl.estimate.hurst_gjr((nu_hat / 2.0) * path, 2.0, est.lags)
+        trial_nu = impl.estimate.vol_of_vol_from_intercept(trial.intercept)
+        annual.append(impl.estimate.rbergomi_nu(trial_nu, float(np.clip(trial.H, 0.01, 0.99))))
+    assert est.se_mc_nu == pytest.approx(float(np.std(annual, ddof=1)), rel=1e-12)
+    assert -1.0 < est.corr_mc_H_nu_per_day < 0.0
+    eps = 1e-6
+    slope_H = (
+        impl.estimate.rbergomi_nu(est.nu_per_day, est.H + eps)
+        - impl.estimate.rbergomi_nu(est.nu_per_day, est.H - eps)
+    ) / (2.0 * eps)
+    slope_nu = impl.estimate.rbergomi_nu(1.0, est.H)
+    assert est.se_mc_nu < abs(slope_H) * est.se_mc_H + slope_nu * est.se_mc_nu_per_day
 
 
 def test_simulated_rbergomi_nu_is_recovered_within_the_replication_bound(impl):

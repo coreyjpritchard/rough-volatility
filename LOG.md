@@ -6,6 +6,34 @@ Dated entries, newest first. What was learned, what surprised, open questions.
 on main. Rough Bergomi returns the hybrid-scheme components `(dW, I_1, ..., I_kappa)`
 on the volatility child. **Next:** session 01, when does the estimator lie.
 
+## 2026-10-22: one headline H, a joint error on nu, and a lock file
+
+**Found.** The Monte Carlo standard error of Ĥ on 40 fBm paths moves with the draw:
+0.009 in session 00 and 0.0134 in RV-c (seed 20261014), at the same point
+estimate. On 1,000 paths (seed 20261014) it is 0.0105 at lags 1 to 50. The headline is
+now Ĥ = 0.148 plus or minus 0.010 (q = 2, lags 1 to 50, Oxford-Man rv5, 5,552 days).
+The multi-q slope, 0.149, is a separate estimate. The RV-c table at 1,000 paths:
+
+| Source | 1 to 10 | 1 to 20 | 1 to 50 | 1 to 100 | 1 to 200 |
+|---|---|---|---|---|---|
+| rv5, n = 5,552 | 0.1583 (0.0071) | 0.1508 (0.0078) | 0.1475 (0.0105) | 0.1426 (0.0132) | 0.1225 (0.0154) |
+| Parkinson, n = 6,731 | 0.0793 (0.0049) | 0.0844 (0.0052) | 0.0900 (0.0068) | 0.0920 (0.0089) | 0.0830 (0.0107) |
+| Garman-Klass, n = 6,731 | 0.0882 (0.0052) | 0.0866 (0.0052) | 0.0916 (0.0067) | 0.0925 (0.0087) | 0.0824 (0.0105) |
+
+The point estimates are unchanged. The session 00 app still draws 40 paths so that the
+slider stays fast; its standard error is a rough guide only.
+
+The error on the rough Bergomi nu now comes from the (H, intercept) pair on each
+bootstrap path, not from H alone. On 1,000 paths (seed 20261021) the correlation
+between Ĥ and nu_per_day is -0.789, and nu = 1.328 plus or minus 0.067. The earlier
+plus or minus 0.115 held nu_per_day fixed. `RegimeVolEstimate` carries `se_mc_nu` and
+`corr_mc_H_nu_per_day`, and `tests/test_hurst_routes.py` checks both on synthetic fBm.
+
+The wording of the intercept is fixed in `docs/notes/hurst-routes.md`: nu_per_day is the
+scale of log-variance increments, sd(log v_{t+Delta} - log v_t) = nu_per_day Delta^H.
+
+Dependencies are locked in `uv.lock` (Python 3.11), and `make reproduce` runs the tests
+and every figure script from its seed.
 ## 2026-10-14: near-field components, so a step-dependent nu can rebuild Y
 
 **Found.** `RoughBergomi.volterra_components` returns the hybrid scheme's

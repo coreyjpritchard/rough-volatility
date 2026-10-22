@@ -5,7 +5,8 @@ The session ladder. Levels are defined in `CLAUDE.md`: 0 play, 1 reproduce,
 
 - [ ] **00 What does H do to a path, and what is H for the S&P 500?** (level 0).
   `sessions/00_what_is_rough.py`. A slider on H morphs an fBm path; the Gatheral,
-  Jaisson and Rosenbaum (2018) estimator on S&P 500 realised volatility gives Ĥ = 0.149;
+  Jaisson and Rosenbaum (2018) estimator on S&P 500 realised volatility gives Ĥ = 0.148
+  (q = 2; the multi-q slope is 0.149);
   the same estimator recovers known H on fBm and about 1/2 on Heston.
 - [ ] **01 When does the estimator lie?** (level 2). Add microstructure noise and
   measurement error to simulated log volatility and watch Ĥ move. Vary sample length,
