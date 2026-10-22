@@ -107,13 +107,36 @@ def main() -> None:
     with nu_path.open("w", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(
-            ["route", "lags", "H", "se_mc_H", "nu_per_day", "se_mc_nu_per_day",
-             "corr_mc_H_nu_per_day", "rbergomi_nu", "se_mc_nu", "reps", "seed", "n_obs"]
+            [
+                "route",
+                "lags",
+                "H",
+                "se_mc_H",
+                "nu_per_day",
+                "se_mc_nu_per_day",
+                "corr_mc_H_nu_per_day",
+                "rbergomi_nu",
+                "se_mc_nu",
+                "reps",
+                "seed",
+                "n_obs",
+            ]
         )
         writer.writerow(
-            ["oxford-man", "1 to 50", nu_fit.H, nu_fit.se_mc_H, nu_fit.nu_per_day,
-             nu_fit.se_mc_nu_per_day, nu_fit.corr_mc_H_nu_per_day, nu_fit.to_rbergomi_nu(),
-             nu_fit.se_mc_nu, REPS, SEED + 7, nu_fit.n_obs]
+            [
+                "oxford-man",
+                "1 to 50",
+                nu_fit.H,
+                nu_fit.se_mc_H,
+                nu_fit.nu_per_day,
+                nu_fit.se_mc_nu_per_day,
+                nu_fit.corr_mc_H_nu_per_day,
+                nu_fit.to_rbergomi_nu(),
+                nu_fit.se_mc_nu,
+                REPS,
+                SEED + 7,
+                nu_fit.n_obs,
+            ]
         )
 
     term_path = OUT_DIR / "rvc_spx_term.csv"
@@ -180,8 +203,14 @@ def main() -> None:
     values = [fit.H for _label, fit in skew_rows]
     ax.plot(range(len(values)), values, "s", ms=7, color="#52514e", ls="")
     for i, value in enumerate(values):
-        ax.annotate(f"{value:.3f}", (i, value), xytext=(0, 7), textcoords="offset points",
-                    ha="center", fontsize=8)
+        ax.annotate(
+            f"{value:.3f}",
+            (i, value),
+            xytext=(0, 7),
+            textcoords="offset points",
+            ha="center",
+            fontsize=8,
+        )
     ax.set_xticks(range(len(labels)), labels, fontsize=8)
     ax.set_xlim(-0.5, len(values) - 0.5)
     ax.set_ylim(0.0, 0.25)

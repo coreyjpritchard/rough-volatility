@@ -416,9 +416,7 @@ class RoughBergomi:
             raise ValueError(f"n_paths must be positive, got {n_paths}")
         n = times.size - 1
         horizon = float(times[-1])
-        return hybrid_scheme_rng(
-            float(H), n, horizon, n_paths, generator(seed), kappa=self.kappa
-        )
+        return hybrid_scheme_rng(float(H), n, horizon, n_paths, generator(seed), kappa=self.kappa)
 
     def _draw(self, n_paths: int, times: np.ndarray, *, seed, state0):
         times = _uniform_times(times)

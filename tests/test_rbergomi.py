@@ -397,9 +397,7 @@ def test_volterra_increments_match_simulate_dw():
     times = np.linspace(0.0, 0.5, 9)
     parent = 11
     for H, kappa in ((0.1, 2), (0.5, 1)):
-        model = RoughBergomi(
-            H=H, nu=1.5, rho=-0.4, xi0=0.05, kappa=kappa, n_paths=6, n_steps=8
-        )
+        model = RoughBergomi(H=H, nu=1.5, rho=-0.4, xi0=0.05, kappa=kappa, n_paths=6, n_steps=8)
         paths = model.simulate(6, times, seed=parent)
         child = spawn(parent, 4)[1]
         dW = model.volterra_increments(6, times, seed=child, H=H)
@@ -482,9 +480,7 @@ def test_components_rebuild_simulates_y():
     nu = 1.5
     xi0 = 0.05
     for H, kappa in ((0.1, 1), (0.1, 2), (0.5, 1)):
-        model = RoughBergomi(
-            H=H, nu=nu, rho=-0.4, xi0=xi0, kappa=kappa, n_paths=6, n_steps=8
-        )
+        model = RoughBergomi(H=H, nu=nu, rho=-0.4, xi0=xi0, kappa=kappa, n_paths=6, n_steps=8)
         paths = model.simulate(6, times, seed=parent)
         child = spawn(parent, 4)[1]
         components = model.volterra_components(6, times, seed=child, H=H)
