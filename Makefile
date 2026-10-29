@@ -12,7 +12,11 @@ test:
 lint:
 	uv run ruff check .
 
-figures:
+# Yahoo's terms do not allow redistribution, so this cache is built locally.
+data/spx_ohlc_yahoo.parquet:
+	uv run --extra data python -m roughvol.realised yahoo
+
+figures: data/spx_ohlc_yahoo.parquet
 	uv run python docs/make_readme_figure.py
 	uv run python scripts/figures_rva.py
 	uv run python scripts/figures_rvb.py

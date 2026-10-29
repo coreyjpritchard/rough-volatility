@@ -6,6 +6,19 @@ Dated entries, newest first. What was learned, what surprised, open questions.
 on main. Rough Bergomi returns the hybrid-scheme components `(dW, I_1, ..., I_kappa)`
 on the volatility child. **Next:** session 01, when does the estimator lie.
 
+## 2026-10-29: the Yahoo cache is built locally, not committed
+
+`data/spx_ohlc_yahoo.parquet` is no longer in git. Yahoo's terms
+(https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html, section 2(h)) do not allow
+its content to be redistributed without written permission. The file is in `.gitignore`
+and `python -m roughvol.realised yahoo` builds it with yfinance, 2000-01-01 to 2026-10-08
+exclusive, the range behind the committed figures. Without it, `load_spx_rv("parkinson")`
+and `load_spx_rv("garman-klass")` raise `FileNotFoundError` with those instructions, the
+session 00 app offers the Oxford-Man source only, and the two tests that read the file
+skip. New tests check both range estimators on synthetic OHLC. No figure, CSV or
+published number changes: the headline uses Oxford-Man rv5, and the Parkinson and
+Garman-Klass rows come from the committed `docs/figures/rvc_routes.csv`.
+
 ## 2026-10-22: one headline H, a joint error on nu, and a lock file
 
 **Found.** The Monte Carlo standard error of Ĥ on 40 fBm paths moves with the draw:
