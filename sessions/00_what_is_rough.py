@@ -149,15 +149,18 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(realised):
-    LOGVOL = {k: realised.log_vol(realised.load_spx_rv(k)) for k in realised.SOURCES}
-    DATES = {k: realised.load_spx_rv(k).index for k in realised.SOURCES}
+    # The Yahoo cache is built locally (python -m roughvol.realised yahoo); without it the
+    # app offers the Oxford-Man source only.
+    _keys = [k for k in realised.SOURCES if k == "oxford-man" or realised.yahoo_available()]
+    LOGVOL = {k: realised.log_vol(realised.load_spx_rv(k)) for k in _keys}
+    DATES = {k: realised.load_spx_rv(k).index for k in _keys}
     return DATES, LOGVOL
 
 
 @app.cell(hide_code=True)
-def _(mo, realised):
+def _(LOGVOL, mo, realised):
     src2 = mo.ui.dropdown(
-        options={v: k for k, v in realised.SOURCES.items()},
+        options={realised.SOURCES[k]: k for k in LOGVOL},
         value=realised.SOURCES["oxford-man"],
         label="data",
     )

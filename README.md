@@ -63,7 +63,7 @@ roughvol/types.py       Paths, PriceResult and ParamSpec, duck-typed by a host
 sessions/               marimo apps, one per session (static export in docs/)
 scripts/, docs/         figure scripts, figures, CSVs and notes
 tests/                  pytest; the mathematical tests take an `impl` fixture
-data/                   committed caches: spx_rv5_oxford_man.parquet, spx_ohlc_yahoo.parquet
+data/                   spx_rv5_oxford_man.parquet (in git); spx_ohlc_yahoo.parquet (local only)
 ```
 
 Session 00 asks what H does to a path and what H is for the S&P 500:
@@ -85,8 +85,12 @@ make reproduce     # uv sync from uv.lock, tests, then every figure and CSV from
 
 That runs `uv sync --extra dev`, `pytest -m "not slow"` and the four figure scripts
 (`docs/make_readme_figure.py`, `scripts/figures_rva.py`, `figures_rvb.py`, `figures_rvc.py`).
-The data are cached in `data/` and the SPX skew term structure in
-`docs/figures/rvc_spx_term.csv`, so nothing is downloaded. The interactive app:
+The Oxford-Man cache is in `data/` and the SPX skew term structure in
+`docs/figures/rvc_spx_term.csv`, so neither is downloaded. The Yahoo cache is not
+redistributed: `make figures` builds it once with yfinance (`python -m roughvol.realised
+yahoo`, 3 January 2000 to 7 October 2026). Yahoo may revise past values, so the Parkinson
+and Garman-Klass rows can differ slightly from the committed CSV. Without the file the tests
+for those two sources skip. The interactive app:
 
 ```bash
 uv run marimo run sessions/00_what_is_rough.py
@@ -110,8 +114,10 @@ uv run marimo run sessions/00_what_is_rough.py
   `https://web.archive.org/web/20220301022212id_/https://realized.oxford-man.ox.ac.uk/images/oxfordmanrealizedvolatilityindices.zip`.
   Only the `.SPX` `rv5` column is kept (100 KB); `roughvol.realised.build_oxford_man_cache`
   rebuilds it.
-- **Yahoo Finance `^GSPC`** daily open, high, low and close from 2000, via yfinance
-  (`uv sync --extra data`); `roughvol.realised.build_yahoo_cache` refreshes it.
+- **Yahoo Finance `^GSPC`** daily open, high, low and close, 2000 to 7 October 2026, via
+  yfinance (`uv sync --extra data`, then `python -m roughvol.realised yahoo`). Yahoo's
+  [terms](https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html) do not allow
+  redistribution without written permission, so the file stays local and is in `.gitignore`.
 - **CBOE SPX option chain**, 14 October 2026, reduced to the at-the-money skew per expiry.
 
 ## References

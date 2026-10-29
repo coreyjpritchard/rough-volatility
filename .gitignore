@@ -12,3 +12,7 @@ data/cache/
 docs/*.html.tmp
 .ipynb_checkpoints/
 __marimo__/
+
+# Yahoo Finance ^GSPC cache: built locally (python -m roughvol.realised yahoo), not
+# redistributed under Yahoo's terms.
+data/spx_ohlc_yahoo.parquet

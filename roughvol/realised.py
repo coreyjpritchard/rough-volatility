@@ -13,8 +13,14 @@ trading day, open to close, no overnight return. 5,552 days, 2000-01-03 to 2022-
 The slim cache is data/spx_rv5_oxford_man.parquet (columns date, rv5).
 
 Source B, "parkinson" and "garman-klass": daily range-based variance from the open, high,
-low and close of ^GSPC on Yahoo Finance via yfinance, 2000-01-03 onwards, cached in
-data/spx_ohlc_yahoo.parquet. Two estimators of the day's variance:
+low and close of ^GSPC on Yahoo Finance via yfinance, 2000-01-03 to 2026-10-07. Yahoo's
+terms do not allow the data to be redistributed, so data/spx_ohlc_yahoo.parquet is not in
+git. Build it locally with
+
+    uv sync --extra data
+    uv run python -m roughvol.realised yahoo
+
+Two estimators of the day's variance:
 
     Parkinson (1980):     (log H/L)^2 / (4 log 2)
     Garman-Klass (1980):  0.5 (log H/L)^2 - (2 log 2 - 1) (log C/O)^2
@@ -47,6 +53,17 @@ OXFORD_MAN_URL = (
 )
 OXFORD_MAN_FILE = DATA_DIR / "spx_rv5_oxford_man.parquet"
 YAHOO_FILE = DATA_DIR / "spx_ohlc_yahoo.parquet"
+YAHOO_START = "2000-01-01"
+YAHOO_END = "2026-10-08"  # exclusive: the committed figures use 2000-01-03 to 2026-10-07
+YAHOO_MISSING = (
+    "{path} is missing. Yahoo's terms do not allow the ^GSPC data to be redistributed, so "
+    "it is not in git. Build it locally with\n"
+    "    uv sync --extra data\n"
+    "    uv run python -m roughvol.realised yahoo\n"
+    "This downloads ^GSPC daily open, high, low and close from Yahoo Finance with yfinance. "
+    "Yahoo may revise past values, so a new download can differ slightly from the one behind "
+    "the committed figures. The oxford-man source needs no download."
+)
 
 Source = Literal["oxford-man", "parkinson", "garman-klass"]
 SOURCES: dict[str, str] = {
@@ -72,13 +89,16 @@ def garman_klass(ohlc: pd.DataFrame) -> pd.Series:
 def load_spx_rv(source: Source = "oxford-man") -> pd.Series:
     """Daily realised variance of the S&P 500 as a Series indexed by date.
 
-    Reads the committed caches in data/. Days with nonpositive variance are dropped, so
-    0.5 * log of the result is always finite. Consecutive entries are consecutive trading
-    days in the source.
+    Reads the caches in data/: the Oxford-Man file is committed, the Yahoo file is built
+    locally (see YAHOO_MISSING). Days with nonpositive variance are dropped, so 0.5 * log of
+    the result is always finite. Consecutive entries are consecutive trading days in the
+    source.
     """
     if source == "oxford-man":
         rv = pd.read_parquet(OXFORD_MAN_FILE).set_index("date")["rv5"].rename("rv")
     elif source in ("parkinson", "garman-klass"):
+        if not YAHOO_FILE.exists():
+            raise FileNotFoundError(YAHOO_MISSING.format(path=YAHOO_FILE))
         ohlc = pd.read_parquet(YAHOO_FILE).set_index("date")
         rv = parkinson(ohlc) if source == "parkinson" else garman_klass(ohlc)
     else:
@@ -109,14 +129,44 @@ def build_oxford_man_cache(url: str = OXFORD_MAN_URL, out: Path = OXFORD_MAN_FIL
     return out
 
 
-def build_yahoo_cache(start: str = "2000-01-01", out: Path = YAHOO_FILE) -> Path:
-    """Download ^GSPC daily OHLC from Yahoo Finance and write (date, open, high, low, close)."""
-    import yfinance as yf
+def yahoo_available() -> bool:
+    """True if the local Yahoo cache exists, so "parkinson" and "garman-klass" can load."""
+    return YAHOO_FILE.exists()
 
-    d = yf.download("^GSPC", start=start, auto_adjust=False, progress=False)
+
+def build_yahoo_cache(
+    start: str = YAHOO_START, end: str | None = YAHOO_END, out: Path | None = None
+) -> Path:
+    """Download ^GSPC daily OHLC from Yahoo Finance and write (date, open, high, low, close).
+
+    The file stays local: data/spx_ohlc_yahoo.parquet is in .gitignore. ``end`` is
+    exclusive; the default matches the committed figures, ``None`` runs to the latest day.
+    """
+    out = YAHOO_FILE if out is None else out
+    try:
+        import yfinance as yf
+    except ImportError as err:
+        raise ImportError("yfinance is needed: uv sync --extra data") from err
+
+    d = yf.download("^GSPC", start=start, end=end, auto_adjust=False, progress=False)
     d.columns = [c[0].lower() if isinstance(c, tuple) else c.lower() for c in d.columns]
     d = d[["open", "high", "low", "close"]].dropna()
     d.index.name = "date"
     out.parent.mkdir(parents=True, exist_ok=True)
     d.reset_index().to_parquet(out, index=False)
     return out
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Rebuild a local cache: python -m roughvol.realised yahoo (or oxford-man)."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Rebuild a data cache in data/.")
+    parser.add_argument("source", choices=["yahoo", "oxford-man"])
+    args = parser.parse_args(argv)
+    out = build_yahoo_cache() if args.source == "yahoo" else build_oxford_man_cache()
+    print(f"wrote {out}")
+
+
+if __name__ == "__main__":
+    main()
