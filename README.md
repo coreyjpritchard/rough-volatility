@@ -35,7 +35,7 @@ upward bias from averaging spot variance over each day is not yet separated from
 | Same series, multi-q slope (q = 0.5 to 3) | 0.149 | `docs/hurst_spx.png` |
 | Hurst exponent from the SPX skew, \|ψ\| = 0.305 T^-0.333, all 40 expiries | 0.167 (windows: 0.115 to 0.207) | `docs/figures/rvc_routes.png`, `scripts/figures_rvc.py` |
 | Rough Bergomi vol of vol from the rv5 intercept, joint bootstrap of (H, intercept) | ν = 1.328 ± 0.067 | `docs/figures/rvc_nu.csv`, `docs/notes/hurst-routes.md` |
-| Hybrid scheme: covariance error of κ = 0 over κ = 1, H = 0.1, n = 16 to 512 | 23 to 24 times | `docs/figures/rva_covariance.png`, `scripts/figures_rva.py` |
+| Hybrid scheme: covariance error of κ = 0 over κ = 1, H = 0.1, n = 16 to 512 | 22.8 to 24.5 times | `docs/figures/rva_covariance.png`, `scripts/figures_rva.py` |
 | Simulated rough Bergomi ATM skew slope, 1 week to 3 months, at H = 0.05, 0.1, 0.2, 0.5 | -0.46, -0.41, -0.32, -0.02 (theory H - 1/2) | `docs/figures/rvb_skew.png`, `scripts/figures_rvb.py` |
 
 H by source and lag window, q = 2, Monte Carlo standard error in brackets:
