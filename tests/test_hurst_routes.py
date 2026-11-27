@@ -4,15 +4,13 @@ The fBm check reuses the session 00 control design: 4,096 steps, 40 paths,
 lags 1 to 50. The band is one Monte Carlo standard deviation of the
 estimator, the spread across those paths, not the regression standard error.
 
-The skew tolerance on an exact power law is 1e-10. The SPX number is the
-refit of the committed term structure, which this pull request computed from
-the 14 October 2026 chain. It is not a copied logarithm.
+The skew tolerance on an exact power law is 1e-10. The estimator is also
+checked on a synthetic term structure; no market chain is committed.
 """
 
 from __future__ import annotations
 
 import math
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -21,7 +19,6 @@ REPS = 40
 N = 4096
 LAGS = range(1, 51)
 SEED = 20261014
-TERM = Path(__file__).resolve().parents[1] / "docs" / "figures" / "rvc_spx_term.csv"
 
 
 def _spread_band(values, truth):
@@ -55,7 +52,7 @@ def test_reported_error_is_the_monte_carlo_se(impl):
 
 def test_skew_route_recovers_exact_power_law(impl):
     maturities = np.geomspace(0.01, 1.0, 15)
-    for H in (0.05, 0.167, 0.4):
+    for H in (0.05, 0.20, 0.4):
         alpha = 0.5 - H
         psi = -1.7 * maturities ** (-alpha)
         full = impl.estimate.hurst_from_skew(maturities, psi)
@@ -69,14 +66,15 @@ def test_skew_route_recovers_exact_power_law(impl):
         assert full.n_obs == 15
 
 
-def test_spx_skew_route_on_the_committed_term_structure(impl):
-    """All 40 expiries of the recomputed 14 October 2026 SPX term structure.
+def test_skew_windows_on_a_synthetic_term_structure(impl):
+    """Windowed fits on a synthetic power-law skew, not a market chain.
 
-    H = 0.1671745060 is the all-expiry fit, checked here to 1e-10 so a silent
-    edit of the table is visible. The same points on the prechosen windows
-    span 0.115277 to 0.207468. Each fit is deterministic, so se_mc is NaN.
+    Twenty geometrically spaced expiries, |psi| = 1.5 T^{-(1/2 - 0.2)}. The
+    all-expiry fit and every pre-chosen window recover H = 0.2 to 1e-10.
+    Each fit is deterministic, so se_mc is NaN.
     """
-    rows = np.genfromtxt(TERM, delimiter=",", names=True)
+    maturities = np.geomspace(1.0 / 252.0, 1.0, 20)
+    psi = -1.5 * maturities ** (-0.3)
     windows = (
         None,
         (1.0 / 252.0, 1.0 / 12.0),
@@ -84,12 +82,10 @@ def test_spx_skew_route_on_the_committed_term_structure(impl):
         (1.0 / 12.0, 1.0),
         (1.0 / 52.0, 1.0),
     )
-    fits = impl.estimate.skew_window_sensitivity(rows["T"], rows["skew"], windows)
+    fits = impl.estimate.skew_window_sensitivity(maturities, psi, windows)
     heights = [fit.H for fit in fits]
-    assert fits[0].n_obs == 40
-    assert heights[0] == pytest.approx(0.16717450602652617, abs=1e-10)
-    assert min(heights) == pytest.approx(0.11527725839990882, abs=1e-10)
-    assert max(heights) == pytest.approx(0.20746848517500888, abs=1e-10)
+    assert fits[0].n_obs == 20
+    assert all(h == pytest.approx(0.2, abs=1e-10) for h in heights)
     assert all(math.isnan(fit.se_mc) for fit in fits)
 
 
