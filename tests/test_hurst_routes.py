@@ -19,6 +19,8 @@ REPS = 40
 N = 4096
 LAGS = range(1, 51)
 SEED = 20261014
+
+
 def _spread_band(values, truth):
     sample = np.asarray(values, dtype=np.float64)
     se_mc = float(sample.std(ddof=1))

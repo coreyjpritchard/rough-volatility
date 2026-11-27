@@ -93,10 +93,7 @@ def write_local_skew(parquet: Path) -> None:
                 "q": "",
             }
         )
-        print(
-            f"skew {label} H={fit.H:.8f} n={fit.n_obs} "
-            f"T={fit.lags[0]:.6f} to {fit.lags[-1]:.6f}"
-        )
+        print(f"skew {label} H={fit.H:.8f} n={fit.n_obs} T={fit.lags[0]:.6f} to {fit.lags[-1]:.6f}")
     csv_path = CACHE_DIR / "implied_skew_routes.csv"
     with csv_path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=["route", "window", "H", "se_mc", "n_obs", "q"])
