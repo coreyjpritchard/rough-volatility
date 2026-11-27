@@ -4,8 +4,7 @@
 Gatheral, Jaisson and Rosenbaum (2018) estimator, q = 2, lags 1 to 50 trading days, on
 5-minute realised variance (`rv5`) from the Oxford-Man realised library, 3 January 2000 to
 25 February 2022 (5,552 days). The ± is the Monte Carlo standard error over 1,000
-fractional Brownian paths of the same length. The SPX implied volatility skew gives an
-independent H = 0.167 (0.115 to 0.207 across maturity windows) from one chain, 14 October 2026.
+fractional Brownian paths of the same length.
 
 ![Two panels. Left: log m(q, Δ) against log lag Δ for q = 0.5 to 3 on S&P 500 rv5, each a straight least-squares line. Right: the fitted slopes ζ_q against q, on a line of slope H = 0.149 for rv5 and 0.092 for the Parkinson range, far below the dashed H = 0.5 line](docs/hurst_spx.png)
 
@@ -16,8 +15,8 @@ m(q, Δ) ∝ Δ^(qH), so every line is straight with slope ζ_q = qH; the right 
 slopes are linear in q, which is monofractal scaling with a single H of about 0.15, far below
 the 0.5 of Brownian volatility (Gatheral, Jaisson and Rosenbaum 2018). Roughness matters for
 options because in a rough model the at-the-money skew behaves like T^(H - 1/2), so it
-steepens sharply at short maturities, as the SPX skew does (|ψ| ∝ T^-0.333 below); the
-simulated rough Bergomi skews in the table follow H - 1/2 (Bayer, Friz and Gatheral 2016). The
+steepens sharply at short maturities. The simulated rough Bergomi skews in the table follow
+H - 1/2 (Bayer, Friz and Gatheral 2016). The
 orange Parkinson line is lower because a daily range estimate adds roughly independent noise
 to log σ, which adds the same amount to m(2, Δ) at every lag and flattens the line.
 The ± 0.010 is the spread of the same estimator over 1,000 simulated fractional Brownian
@@ -33,7 +32,6 @@ upward bias from averaging spot variance over each day is not yet separated from
 |---|---|---|
 | Hurst exponent, Oxford-Man rv5, q = 2, lags 1 to 50 | 0.148 ± 0.010 | `docs/hurst_spx.png`, `docs/make_readme_figure.py` |
 | Same series, multi-q slope (q = 0.5 to 3) | 0.149 | `docs/hurst_spx.png` |
-| Hurst exponent from the SPX skew, \|ψ\| = 0.305 T^-0.333, all 40 expiries | 0.167 (windows: 0.115 to 0.207) | `docs/figures/rvc_routes.png`, `scripts/figures_rvc.py` |
 | Rough Bergomi vol of vol from the rv5 intercept, joint bootstrap of (H, intercept) | ν = 1.328 ± 0.067 | `docs/figures/rvc_nu.csv`, `docs/notes/hurst-routes.md` |
 | Hybrid scheme: covariance error of κ = 0 over κ = 1, H = 0.1, n = 16 to 512 | 22.8 to 24.5 times | `docs/figures/rva_covariance.png`, `scripts/figures_rva.py` |
 | Simulated rough Bergomi ATM skew slope, 1 week to 3 months, at H = 0.05, 0.1, 0.2, 0.5 | -0.46, -0.41, -0.32, -0.02 (theory H - 1/2) | `docs/figures/rvb_skew.png`, `scripts/figures_rvb.py` |
@@ -85,8 +83,7 @@ make reproduce     # uv sync from uv.lock, tests, then every figure and CSV from
 
 That runs `uv sync --extra dev`, `pytest -m "not slow"` and the four figure scripts
 (`docs/make_readme_figure.py`, `scripts/figures_rva.py`, `figures_rvb.py`, `figures_rvc.py`).
-The Oxford-Man cache is in `data/` and the SPX skew term structure in
-`docs/figures/rvc_spx_term.csv`, so neither is downloaded. The Yahoo cache is not
+The Oxford-Man cache is in `data/`, so it is not downloaded. The Yahoo cache is not
 redistributed: `make figures` builds it once with yfinance (`python -m roughvol.realised
 yahoo`, 3 January 2000 to 7 October 2026). Yahoo may revise past values, so the Parkinson
 and Garman-Klass rows can differ slightly from the committed CSV. Without the file the tests
@@ -101,8 +98,9 @@ uv run marimo run sessions/00_what_is_rough.py
 - Ĥ depends on the lag window: 0.158 at lags 1 to 10, 0.122 at lags 1 to 200.
 - The daily range estimators (Parkinson, Garman-Klass) are biased low by their
   measurement noise, about 0.09 against 0.15 from rv5.
-- The skew route uses one day's chain and has no standard error; the spread across
-  maturity windows is the honest range.
+- An implied-skew estimate of H from option quotes is supported in the code
+  (`roughvol.estimate.hurst_from_skew`, or `python scripts/figures_rvc.py path/to/chain.parquet`).
+  This repository does not publish results from that route.
 - ν comes from the realised-variance intercept. It is not a fit of rough Bergomi to option prices.
 - The Oxford-Man library was withdrawn in 2022; the copy used is the last public file on
   the Internet Archive.
@@ -118,7 +116,11 @@ uv run marimo run sessions/00_what_is_rough.py
   yfinance (`uv sync --extra data`, then `python -m roughvol.realised yahoo`). Yahoo's
   [terms](https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html) do not allow
   redistribution without written permission, so the file stays local and is in `.gitignore`.
-- **CBOE SPX option chain**, 14 October 2026, reduced to the at-the-money skew per expiry.
+- **Option chains (optional).** To run the implied-skew estimator on a chain you supply,
+  pass its path to `scripts/figures_rvc.py`. A Cboe delayed-quotes snapshot can be built
+  with the fetch script in the volsurface repository; Cboe's data is subject to Cboe's
+  [terms](https://www.cboe.com/en/terms/). Output from that route is written under
+  `data/cache/` and is not committed.
 
 ## References
 

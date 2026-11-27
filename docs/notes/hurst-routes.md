@@ -1,6 +1,6 @@
 # Two routes to H
 
-The figure `docs/figures/rvc_routes.png` is the Hurst exponent by route. The left panel is the Gatheral, Jaisson and Rosenbaum estimator on three realised-variance series, against the longest lag, with the Monte Carlo standard error as the bar. The right panel is H = 1/2 - alpha from the S&P 500 implied-volatility skew, on five maturity windows. There is no line at a true H.
+The figure `docs/figures/rvc_routes.png` is the Hurst exponent by realised-variance route: the Gatheral, Jaisson and Rosenbaum estimator on three realised-variance series, against the longest lag, with the Monte Carlo standard error as the bar. There is no line at a true H.
 
 ## Realised variance
 
@@ -26,18 +26,6 @@ A two-regime series is two long blocks. Each block is estimated on its own run, 
 
 ## The skew
 
-|psi| = A T^{-alpha}, and H = 1/2 - alpha. The fit is a regression of log|psi| on log T. It has no path to resample, so the Monte Carlo standard error on this route is NaN. The uncertainty to report with the all-expiry number is the range across windows, 0.115277 to 0.207468, alongside 0.167175.
+|psi| = A T^{-alpha}, and H = 1/2 - alpha. The fit is a regression of log|psi| on log T. It has no path to resample, so the Monte Carlo standard error on this route is NaN. The honest uncertainty, when you run it, is the range across pre-chosen maturity windows.
 
-The chain is the CBOE SPX snapshot of 14 October 2026, 40 expiries, as tidied in the volsurface snapshot file. The forward and the discount factor at each expiry are the put-call parity regression. Out-of-the-money prices are inverted, and the at-the-money skew is the linear coefficient of a quadratic in log-moneyness on |k| <= max(0.15 sqrt(T), 0.01). This package does not import the host. The script that builds the term structure does, and only there.
-
-On all 40 expiries, |psi| = 0.305112 T^{-0.332825}, so H = 0.167175. The same points on other windows:
-
-| Window | Expiries | H |
-|---|---|---|
-| all | 40 | 0.167175 |
-| 1/252 to 1/12 | 20 | 0.206983 |
-| 1/52 to 1/4 | 28 | 0.207468 |
-| 1/12 to 1 | 18 | 0.115277 |
-| 1/52 to 1 | 35 | 0.161886 |
-
-The window 1/52 to 1/4 sits 0.040 above the all-expiry fit. The window 1/12 to 1 sits 0.052 below it. The two front expiries have discount factors above 1. Dropping every expiry shorter than a week, which drops those two, moves H by 0.005, to 0.161886. A later fit can cap the discount factor at 1 and should be reported beside this table.
+The estimator is `roughvol.estimate.hurst_from_skew`. To apply it to a chain you supply, run `python scripts/figures_rvc.py path/to/chain.parquet`. Implied volatilities and the at-the-money quadratic are computed by volsurface (parity forward, out-of-the-money price, half-width `max(0.15 sqrt(T), 0.01)`), imported only on that optional path. Output is written under `data/cache/` and is not committed. This repository does not publish implied-vol results from option quotes.
